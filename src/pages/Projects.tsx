@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { MainLayout } from "@/components/MainLayout";
 import { Button } from "@/components/ui/button";
@@ -8,7 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { Calendar as CalendarIcon, Plus, Search } from "lucide-react";
 import { ProjectForm } from "@/components/ProjectForm";
 import { useQuery } from "@tanstack/react-query";
-import { getProjects, getEnhancedTasks, getClientById } from "@/lib/mock-data";
+import { getProjects, getEnhancedTasks } from "@/lib/api-utils";
+import { getClientById } from "@/lib/mock-data";
 import { Project } from "@/lib/types";
 import { format } from "date-fns";
 
@@ -27,7 +27,7 @@ const Projects = () => {
   });
   
   // Filter projects based on search query
-  const filteredProjects = projects.filter(project => 
+  const filteredProjects = projects.filter((project: Project) => 
     searchQuery === "" ||
     project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     project.description.toLowerCase().includes(searchQuery.toLowerCase())

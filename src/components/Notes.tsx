@@ -14,6 +14,7 @@ import { Plus, Edit, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getNotes, addNote, deleteNote } from "@/lib/api-utils";
+import { Note } from "@/lib/types";
 
 const noteSchema = z.object({
   title: z.string().min(1, "Заголовок обязателен"),
@@ -52,7 +53,8 @@ export default function Notes({ entityId, entityType }: NotesProps) {
   const onSubmit = async (values: NoteFormValues) => {
     try {
       await addNote({
-        ...values,
+        title: values.title,
+        content: values.content,
         entityId,
         entityType,
         createdAt: new Date().toISOString(),

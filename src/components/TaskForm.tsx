@@ -1,4 +1,3 @@
-
 import React, { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -111,6 +110,12 @@ export function TaskForm({ open, onOpenChange }: TaskFormProps) {
 
   async function onSubmit(values: TaskFormValues) {
     try {
+      // Make sure all subtasks have required fields
+      const validatedSubtasks = values.subtasks.map(subtask => ({
+        title: subtask.title || "",
+        completed: !!subtask.completed,
+      }));
+      
       await addTask({
         title: values.title,
         description: values.description,
@@ -119,7 +124,7 @@ export function TaskForm({ open, onOpenChange }: TaskFormProps) {
         clientId: values.clientId || undefined,
         projectId: values.projectId || undefined,
         assigneeIds: values.assigneeIds,
-        subtasks: values.subtasks,
+        subtasks: validatedSubtasks,
       });
       
       toast.success("Задача успешно добавлена");

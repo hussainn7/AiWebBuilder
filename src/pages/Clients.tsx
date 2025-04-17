@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { MainLayout } from "@/components/MainLayout";
 import { Button } from "@/components/ui/button";
@@ -8,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { ExternalLink, Plus, Search } from "lucide-react";
 import { ClientForm } from "@/components/ClientForm";
 import { useQuery } from "@tanstack/react-query";
-import { getClients, getEnhancedTasks } from "@/lib/mock-data";
+import { getClients, getEnhancedTasks } from "@/lib/api-utils";
 import { Client } from "@/lib/types";
 
 const Clients = () => {
@@ -26,7 +25,7 @@ const Clients = () => {
   });
   
   // Filter clients based on search query
-  const filteredClients = clients.filter(client => 
+  const filteredClients = clients.filter((client: Client) => 
     searchQuery === "" ||
     client.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     client.description.toLowerCase().includes(searchQuery.toLowerCase())

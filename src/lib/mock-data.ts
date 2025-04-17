@@ -1,4 +1,5 @@
-import { Task, Client, Project, User, TasksByStatus } from './types';
+
+import { Task, Client, Project, User, TasksByStatus, SubTask, Comment } from './types';
 
 // Mock Users
 export const users: User[] = [

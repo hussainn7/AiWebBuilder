@@ -95,27 +95,58 @@
   }
 }
 
-/* Custom styles for task status badges */
-.status-badge {
-  @apply px-2 py-0.5 rounded-full text-xs font-medium;
+@layer components {
+  .card-hover {
+    @apply hover:shadow-md transition-all duration-200 hover:translate-y-[-2px];
+  }
+  
+  .icon-container {
+    @apply flex items-center justify-center w-9 h-9 rounded-full;
+  }
+  
+  .status-badge {
+    @apply px-2 py-0.5 rounded-full text-xs font-medium inline-flex items-center gap-1;
+  }
 }
 
+@layer utilities {
+  .gradient-border {
+    border-image: linear-gradient(to right, #6366f1, #8b5cf6) 1;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out;
+}
+
+/* Status badge styles */
 .status-draft {
-  @apply bg-status-draft text-gray-800;
+  @apply bg-gray-100 text-gray-800;
 }
 
 .status-in-progress {
-  @apply bg-status-in-progress text-blue-800;
+  @apply bg-blue-100 text-blue-800;
 }
 
 .status-under-review {
-  @apply bg-status-under-review text-yellow-800;
+  @apply bg-yellow-100 text-yellow-800;
 }
 
 .status-completed {
-  @apply bg-status-completed text-green-800;
+  @apply bg-green-100 text-green-800;
 }
 
 .status-canceled {
-  @apply bg-status-canceled text-red-800;
+  @apply bg-red-100 text-red-800;
 }

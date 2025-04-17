@@ -92,6 +92,114 @@ const Analytics = () => {
             <TabsTrigger value="users">Сотрудники</TabsTrigger>
             <TabsTrigger value="clients">Клиенты</TabsTrigger>
           </TabsList>
+        
+          <div className="mt-6">
+            <TabsContent value="tasks">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Динамика задач</CardTitle>
+                    <CardDescription>Создание и выполнение задач со временем</CardDescription>
+                  </CardHeader>
+                  <CardContent className="h-80">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={generateTaskCompletionData()}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="date" />
+                        <YAxis allowDecimals={false} />
+                        <Tooltip />
+                        <Legend />
+                        <Line type="monotone" dataKey="created" name="Создано" stroke="#8884d8" />
+                        <Line type="monotone" dataKey="completed" name="Выполнено" stroke="#82ca9d" />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+                
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Распределение по статусам</CardTitle>
+                    <CardDescription>Текущее состояние задач</CardDescription>
+                  </CardHeader>
+                  <CardContent className="h-80">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={taskStatusData}
+                          cx="50%"
+                          cy="50%"
+                          labelLine={false}
+                          outerRadius={80}
+                          fill="#8884d8"
+                          dataKey="value"
+                          label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                        >
+                          {taskStatusData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+            
+            <TabsContent value="users">
+              <div className="grid grid-cols-1 gap-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Эффективность сотрудников</CardTitle>
+                    <CardDescription>Назначенные и выполненные задачи</CardDescription>
+                  </CardHeader>
+                  <CardContent className="h-96">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart 
+                        data={employeePerformanceData}
+                        layout="vertical"
+                        margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis type="number" />
+                        <YAxis type="category" dataKey="name" width={80} />
+                        <Tooltip />
+                        <Legend />
+                        <Bar dataKey="assigned" name="Назначено" fill="#8884d8" />
+                        <Bar dataKey="completed" name="Выполнено" fill="#82ca9d" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+            
+            <TabsContent value="clients">
+              <div className="grid grid-cols-1 gap-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Распределение задач по клиентам</CardTitle>
+                    <CardDescription>Количество задач для каждого клиента</CardDescription>
+                  </CardHeader>
+                  <CardContent className="h-96">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart 
+                        data={clientTaskData}
+                        layout="vertical"
+                        margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis type="number" />
+                        <YAxis type="category" dataKey="name" width={120} />
+                        <Tooltip />
+                        <Bar dataKey="tasks" name="Задачи" fill="#8884d8" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+          </div>
         </Tabs>
         
         <Select defaultValue={timeRange} onValueChange={(value) => setTimeRange(value as any)}>
@@ -105,112 +213,6 @@ const Analytics = () => {
           </SelectContent>
         </Select>
       </div>
-      
-      <TabsContent value="tasks" className="mt-0">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Динамика задач</CardTitle>
-              <CardDescription>Создание и выполнение задач со временем</CardDescription>
-            </CardHeader>
-            <CardContent className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={generateTaskCompletionData()}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="date" />
-                  <YAxis allowDecimals={false} />
-                  <Tooltip />
-                  <Legend />
-                  <Line type="monotone" dataKey="created" name="Создано" stroke="#8884d8" />
-                  <Line type="monotone" dataKey="completed" name="Выполнено" stroke="#82ca9d" />
-                </LineChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader>
-              <CardTitle>Распределение по статусам</CardTitle>
-              <CardDescription>Текущее состояние задач</CardDescription>
-            </CardHeader>
-            <CardContent className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={taskStatusData}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    outerRadius={80}
-                    fill="#8884d8"
-                    dataKey="value"
-                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                  >
-                    {taskStatusData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        </div>
-      </TabsContent>
-      
-      <TabsContent value="users" className="mt-0">
-        <div className="grid grid-cols-1 gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Эффективность сотрудников</CardTitle>
-              <CardDescription>Назначенные и выполненные задачи</CardDescription>
-            </CardHeader>
-            <CardContent className="h-96">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart 
-                  data={employeePerformanceData}
-                  layout="vertical"
-                  margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis type="number" />
-                  <YAxis type="category" dataKey="name" width={80} />
-                  <Tooltip />
-                  <Legend />
-                  <Bar dataKey="assigned" name="Назначено" fill="#8884d8" />
-                  <Bar dataKey="completed" name="Выполнено" fill="#82ca9d" />
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        </div>
-      </TabsContent>
-      
-      <TabsContent value="clients" className="mt-0">
-        <div className="grid grid-cols-1 gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Распределение задач по клиентам</CardTitle>
-              <CardDescription>Количество задач для каждого клиента</CardDescription>
-            </CardHeader>
-            <CardContent className="h-96">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart 
-                  data={clientTaskData}
-                  layout="vertical"
-                  margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis type="number" />
-                  <YAxis type="category" dataKey="name" width={120} />
-                  <Tooltip />
-                  <Bar dataKey="tasks" name="Задачи" fill="#8884d8" />
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        </div>
-      </TabsContent>
     </MainLayout>
   );
 };

@@ -2,21 +2,22 @@
 import { useState } from "react";
 import { MainLayout } from "@/components/MainLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
+import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getTasksByStatus, getEnhancedTasks, users } from "@/lib/mock-data";
 import TaskCard from "@/components/TaskCard";
-import UserAvatar from "@/components/UserAvatar";
-import { ChartContainer, ChartTooltipContent } from "@/components/ui/chart";
-import { ArrowRight, BarChart3, Calendar, CheckCircle, CircleDashed, Clock, Layers, Users } from "lucide-react";
+import { ArrowRight, CheckCircle, Clock, Layers } from "lucide-react";
 import StatusBadge from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Status } from "@/lib/types";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { ChartContainer, ChartTooltipContent } from "@/components/ui/chart";
 
 const Dashboard = () => {
   const [period, setPeriod] = useState<"day" | "week" | "month">("week");
   const tasksByStatus = getTasksByStatus();
   const allTasks = getEnhancedTasks();
+  const isMobile = useIsMobile();
   
   // Get the total count per status for the pie chart
   const statusCounts = [
@@ -26,27 +27,6 @@ const Dashboard = () => {
     { name: "Завершено", value: tasksByStatus.completed.length, color: "#86EFAC" },
     { name: "Отменено", value: tasksByStatus.canceled.length, color: "#FECACA" }
   ];
-  
-  const statusConfig = {
-    draft: { icon: CircleDashed, color: "#E2E8F0" },
-    "in-progress": { icon: Clock, color: "#93C5FD" },
-    "under-review": { icon: Layers, color: "#FDE68A" },
-    completed: { icon: CheckCircle, color: "#86EFAC" },
-    canceled: { icon: CircleDashed, color: "#FECACA" }
-  };
-  
-  // Get workload per user for the bar chart
-  const userWorkload = users.map(user => {
-    const assignedTasks = allTasks.filter(task => 
-      task.assignees.some(assignee => assignee.id === user.id)
-    );
-    
-    return {
-      name: user.name.split(" ")[0],
-      tasks: assignedTasks.length,
-      completed: assignedTasks.filter(task => task.status === "completed").length
-    };
-  }).sort((a, b) => b.tasks - a.tasks).slice(0, 7);
   
   // Get recent tasks
   const recentTasks = [...allTasks]
@@ -60,115 +40,73 @@ const Dashboard = () => {
     .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())
     .slice(0, 3);
 
-  const getStatusCounts = () => {
-    return Object.entries(tasksByStatus).map(([status, tasks]) => ({
-      status: status as Status,
-      count: tasks.length,
-    }));
-  };
-
   return (
     <MainLayout title="Дашборд">
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-6 mb-6">
         <Card className="shadow-sm hover:shadow-md transition-shadow">
           <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
-            <CardTitle className="text-lg font-semibold">Всего задач</CardTitle>
+            <CardTitle className="text-base md:text-lg font-semibold">Всего задач</CardTitle>
             <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
               <Layers className="w-4 h-4 text-primary" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">{allTasks.length}</div>
+            <div className="text-2xl md:text-3xl font-bold">{allTasks.length}</div>
             <p className="text-xs text-muted-foreground mt-1">Текущий месяц</p>
           </CardContent>
         </Card>
         
         <Card className="shadow-sm hover:shadow-md transition-shadow">
           <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
-            <CardTitle className="text-lg font-semibold">В работе</CardTitle>
+            <CardTitle className="text-base md:text-lg font-semibold">В работе</CardTitle>
             <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
               <Clock className="w-4 h-4 text-blue-500" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">{tasksByStatus["in-progress"].length}</div>
-            <p className="text-xs text-muted-foreground mt-1">Текущие активные задачи</p>
+            <div className="text-2xl md:text-3xl font-bold">{tasksByStatus["in-progress"].length}</div>
+            <p className="text-xs text-muted-foreground mt-1">Текущие задачи</p>
           </CardContent>
         </Card>
         
         <Card className="shadow-sm hover:shadow-md transition-shadow">
           <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
-            <CardTitle className="text-lg font-semibold">Завершено</CardTitle>
+            <CardTitle className="text-base md:text-lg font-semibold">Завершено</CardTitle>
             <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
               <CheckCircle className="w-4 h-4 text-green-500" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">{tasksByStatus.completed.length}</div>
-            <p className="text-xs text-muted-foreground mt-1">За последние 30 дней</p>
+            <div className="text-2xl md:text-3xl font-bold">{tasksByStatus.completed.length}</div>
+            <p className="text-xs text-muted-foreground mt-1">За 30 дней</p>
           </CardContent>
         </Card>
         
         <Card className="shadow-sm hover:shadow-md transition-shadow">
           <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
-            <CardTitle className="text-lg font-semibold">Команда</CardTitle>
+            <CardTitle className="text-base md:text-lg font-semibold">Команда</CardTitle>
             <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
-              <Users className="w-4 h-4 text-purple-500" />
+              <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-purple-500">
+                <path d="M7.5 0.875C5.49797 0.875 3.875 2.49797 3.875 4.5C3.875 6.15288 4.98124 7.54738 6.49373 7.98351C5.2997 8.12901 4.27557 8.55134 3.50407 9.31167C2.52216 10.2794 2 11.661 2 13.5C2 13.7071 2.16789 13.875 2.375 13.875C2.58211 13.875 2.75 13.7071 2.75 13.5C2.75 11.839 3.27784 10.7206 4.05093 9.96333C4.82093 9.20889 5.91612 8.875 7.5 8.875C9.08388 8.875 10.1791 9.20889 10.9491 9.96333C11.7222 10.7206 12.25 11.839 12.25 13.5C12.25 13.7071 12.4179 13.875 12.625 13.875C12.8321 13.875 13 13.7071 13 13.5C13 11.661 12.4778 10.2794 11.4959 9.31167C10.7244 8.55134 9.7003 8.12901 8.50627 7.98351C10.0188 7.54738 11.125 6.15288 11.125 4.5C11.125 2.49797 9.50203 0.875 7.5 0.875ZM4.625 4.5C4.625 2.91015 5.91015 1.625 7.5 1.625C9.08985 1.625 10.375 2.91015 10.375 4.5C10.375 6.08985 9.08985 7.375 7.5 7.375C5.91015 7.375 4.625 6.08985 4.625 4.5Z" fill="currentColor" fillRule="evenodd" clipRule="evenodd"></path>
+              </svg>
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">{users.length}</div>
-            <p className="text-xs text-muted-foreground mt-1">Активных сотрудников</p>
+            <div className="text-2xl md:text-3xl font-bold">{users.length}</div>
+            <p className="text-xs text-muted-foreground mt-1">Сотрудников</p>
           </CardContent>
         </Card>
       </div>
         
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Team workload chart */}
-        <Card className="lg:col-span-2 shadow-sm">
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="text-xl font-semibold">Нагрузка команды</CardTitle>
-                <CardDescription>Распределение задач между сотрудниками</CardDescription>
-              </div>
-              <Tabs defaultValue="week" className="mt-2">
-                <TabsList className="grid grid-cols-3 w-[200px]">
-                  <TabsTrigger value="day" onClick={() => setPeriod("day")}>День</TabsTrigger>
-                  <TabsTrigger value="week" onClick={() => setPeriod("week")}>Неделя</TabsTrigger>
-                  <TabsTrigger value="month" onClick={() => setPeriod("month")}>Месяц</TabsTrigger>
-                </TabsList>
-              </Tabs>
-            </div>
-          </CardHeader>
-          <CardContent className="h-[300px]">
-            <ChartContainer 
-              config={{
-                tasks: { theme: { light: "#93C5FD", dark: "#93C5FD" }, label: "Всего задач" },
-                completed: { theme: { light: "#86EFAC", dark: "#86EFAC" }, label: "Завершено" },
-              }}
-              className="w-full h-full"
-            >
-              <BarChart data={userWorkload} margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.2} />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} />
-                <YAxis allowDecimals={false} axisLine={false} tickLine={false} />
-                <Tooltip content={<ChartTooltipContent />} />
-                <Bar dataKey="tasks" name="tasks" fill="var(--color-tasks)" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="completed" name="completed" fill="var(--color-completed)" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ChartContainer>
-          </CardContent>
-        </Card>
-        
         {/* Status chart */}
         <Card className="shadow-sm">
           <CardHeader className="pb-2">
-            <CardTitle className="text-xl font-semibold">Статус задач</CardTitle>
+            <CardTitle className="text-lg md:text-xl font-semibold">Статус задач</CardTitle>
             <CardDescription>Распределение по статусам</CardDescription>
           </CardHeader>
-          <CardContent className="h-[300px]">
+          <CardContent className="h-[250px] md:h-[300px]">
             <ChartContainer 
               config={{
                 draft: { theme: { light: "#E2E8F0", dark: "#E2E8F0" }, label: "Черновик" },
@@ -184,8 +122,8 @@ const Dashboard = () => {
                   data={statusCounts}
                   cx="50%"
                   cy="50%"
-                  innerRadius={60}
-                  outerRadius={90}
+                  innerRadius={isMobile ? 40 : 60}
+                  outerRadius={isMobile ? 70 : 90}
                   paddingAngle={2}
                   dataKey="value"
                   nameKey="name"
@@ -194,26 +132,17 @@ const Dashboard = () => {
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>
-                <Tooltip content={<ChartTooltipContent />} />
-                <Legend 
-                  layout="vertical"
-                  align="right"
-                  verticalAlign="middle"
-                  iconType="circle"
-                  iconSize={10}
-                />
+                <ChartTooltipContent />
               </PieChart>
             </ChartContainer>
           </CardContent>
         </Card>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
+        
         {/* Recent Tasks */}
         <Card className="lg:col-span-2 shadow-sm">
           <CardHeader className="pb-2 flex flex-row items-center justify-between">
             <div>
-              <CardTitle className="text-xl font-semibold">Недавние задачи</CardTitle>
+              <CardTitle className="text-lg md:text-xl font-semibold">Недавние задачи</CardTitle>
               <CardDescription>Последние обновленные задачи</CardDescription>
             </div>
             <Button variant="ghost" size="sm" className="text-primary gap-1" asChild>
@@ -233,22 +162,27 @@ const Dashboard = () => {
             </div>
           </CardContent>
         </Card>
-        
-        {/* Upcoming Deadlines */}
+      </div>
+
+      {/* Upcoming Deadlines */}
+      <div className="mt-6">
         <Card className="shadow-sm">
           <CardHeader className="pb-2 flex flex-row items-center justify-between">
             <div>
-              <CardTitle className="text-xl font-semibold">Предстоящие дедлайны</CardTitle>
+              <CardTitle className="text-lg md:text-xl font-semibold">Предстоящие дедлайны</CardTitle>
               <CardDescription>Ближайшие сроки выполнения</CardDescription>
             </div>
             <Button variant="ghost" size="sm" className="text-primary gap-1" asChild>
               <a href="/calendar">
-                Календарь <Calendar className="h-4 w-4" />
+                Календарь 
+                <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg" className="ml-1">
+                  <path d="M4.5 1C4.77614 1 5 1.22386 5 1.5V2H10V1.5C10 1.22386 10.2239 1 10.5 1C10.7761 1 11 1.22386 11 1.5V2H12.5C13.3284 2 14 2.67157 14 3.5V12.5C14 13.3284 13.3284 14 12.5 14H2.5C1.67157 14 1 13.3284 1 12.5V3.5C1 2.67157 1.67157 2 2.5 2H4V1.5C4 1.22386 4.22386 1 4.5 1ZM2.5 3C2.22386 3 2 3.22386 2 3.5V5H13V3.5C13 3.22386 12.7761 3 12.5 3H2.5ZM2 12.5C2 12.7761 2.22386 13 2.5 13H12.5C12.7761 13 13 12.7761 13 12.5V6H2V12.5Z" fill="currentColor" fillRule="evenodd" clipRule="evenodd"></path>
+                </svg>
               </a>
             </Button>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
+            <div className="space-y-3">
               {upcomingDeadlines.map(task => (
                 <div key={task.id} className="flex items-start space-x-3 border-b pb-3 last:border-0 rounded-md p-3 hover:bg-muted/30 transition-colors">
                   <div className="flex-1">
@@ -261,64 +195,12 @@ const Dashboard = () => {
                       {new Date(task.dueDate).toLocaleDateString("ru-RU")}
                     </p>
                   </div>
-                  <div className="flex -space-x-2">
-                    {task.assignees.slice(0, 2).map((user) => (
-                      <UserAvatar key={user.id} user={user} size="sm" className="-mr-2" />
-                    ))}
-                    {task.assignees.length > 2 && (
-                      <div className="h-6 w-6 rounded-full bg-secondary flex items-center justify-center text-xs">
-                        +{task.assignees.length - 2}
-                      </div>
-                    )}
-                  </div>
                 </div>
               ))}
               
               {upcomingDeadlines.length === 0 && (
                 <p className="text-center text-muted-foreground py-8">Нет предстоящих дедлайнов</p>
               )}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Task status overview */}
-      <div className="mt-6">
-        <Card className="shadow-sm">
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="text-xl font-semibold">Обзор статусов</CardTitle>
-                <CardDescription>Количество задач по статусам</CardDescription>
-              </div>
-              <Button variant="outline" size="sm" asChild>
-                <a href="/tasks">
-                  <BarChart3 className="mr-2 h-4 w-4" /> Подробная аналитика
-                </a>
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-              {getStatusCounts().map(item => {
-                const StatusIcon = statusConfig[item.status].icon;
-                return (
-                  <Card key={item.status} className="border-none shadow-none bg-muted/40">
-                    <CardContent className="p-4 flex flex-col items-center justify-center text-center">
-                      <div 
-                        className="w-10 h-10 rounded-full flex items-center justify-center mb-2"
-                        style={{ backgroundColor: `${statusConfig[item.status].color}30` }}
-                      >
-                        <StatusIcon className="w-5 h-5" style={{ color: statusConfig[item.status].color }} />
-                      </div>
-                      <p className="text-sm font-medium mb-1">
-                        <StatusBadge status={item.status} />
-                      </p>
-                      <p className="text-2xl font-bold">{item.count}</p>
-                    </CardContent>
-                  </Card>
-                );
-              })}
             </div>
           </CardContent>
         </Card>

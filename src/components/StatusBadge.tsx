@@ -10,12 +10,24 @@ const statusLabels: Record<Status, string> = {
   'canceled': 'Отменено'
 };
 
+// Shorter labels for mobile
+const statusLabelsMobile: Record<Status, string> = {
+  'draft': 'Черн.',
+  'in-progress': 'В проц.',
+  'under-review': 'Пров.',
+  'completed': 'Заверш.',
+  'canceled': 'Отмен.'
+};
+
 interface StatusBadgeProps {
   status: Status;
   className?: string;
+  useMobileLabel?: boolean;
 }
 
-const StatusBadge = ({ status, className }: StatusBadgeProps) => {
+const StatusBadge = ({ status, className, useMobileLabel = false }: StatusBadgeProps) => {
+  const label = useMobileLabel ? statusLabelsMobile[status] : statusLabels[status];
+  
   return (
     <span className={cn(
       `inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium`,
@@ -28,7 +40,7 @@ const StatusBadge = ({ status, className }: StatusBadgeProps) => {
       },
       className
     )}>
-      {statusLabels[status]}
+      {label}
     </span>
   );
 };

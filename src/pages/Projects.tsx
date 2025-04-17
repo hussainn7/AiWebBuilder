@@ -9,7 +9,7 @@ import { ProjectForm } from "@/components/ProjectForm";
 import { useQuery } from "@tanstack/react-query";
 import { getProjects, getEnhancedTasks } from "@/lib/api-utils";
 import { getClientById } from "@/lib/mock-data";
-import { Project } from "@/lib/types";
+import { Project, Task } from "@/lib/types";
 import { format } from "date-fns";
 
 const Projects = () => {
@@ -27,7 +27,7 @@ const Projects = () => {
   });
   
   // Filter projects based on search query
-  const filteredProjects = projects.filter((project: Project) => 
+  const filteredProjects = (projects as Project[]).filter((project: Project) => 
     searchQuery === "" ||
     project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     project.description.toLowerCase().includes(searchQuery.toLowerCase())
@@ -35,7 +35,7 @@ const Projects = () => {
   
   // Get tasks count for each project
   const getProjectTasksCount = (projectId: string) => {
-    return allTasks.filter(task => task.projectId === projectId).length;
+    return (allTasks as Task[]).filter(task => task.projectId === projectId).length;
   };
   
   return (

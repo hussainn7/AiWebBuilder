@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-import { clients, projects, users, addClientToMockData, addProjectToMockData, addTaskToMockData, tasks } from './mock-data';
+import { clients, projects, users, addClientToMockData, addProjectToMockData, addTaskToMockData, tasks, getClientById, getProjectById } from './mock-data';
 import { Client, Project, Task, Status, SubTask } from './types';
 
 // Local storage keys
@@ -211,4 +211,22 @@ export const deleteNote = async (noteId: string): Promise<void> => {
   
   // Save to localStorage
   localStorage.setItem(NOTES_KEY, JSON.stringify(updatedNotes));
+};
+
+// Helper to get task with related data
+export const getEnhancedTasks = async () => {
+  const allTasks = await getTasks();
+  
+  return allTasks.map(task => {
+    // Add client and project objects
+    if (task.clientId) {
+      task.client = getClientById(task.clientId);
+    }
+    
+    if (task.projectId) {
+      task.project = getProjectById(task.projectId);
+    }
+    
+    return task;
+  });
 };

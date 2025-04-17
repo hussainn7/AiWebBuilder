@@ -8,7 +8,7 @@ import { ExternalLink, Plus, Search } from "lucide-react";
 import { ClientForm } from "@/components/ClientForm";
 import { useQuery } from "@tanstack/react-query";
 import { getClients, getEnhancedTasks } from "@/lib/api-utils";
-import { Client } from "@/lib/types";
+import { Client, Task } from "@/lib/types";
 
 const Clients = () => {
   const [searchQuery, setSearchQuery] = useState("");
@@ -25,7 +25,7 @@ const Clients = () => {
   });
   
   // Filter clients based on search query
-  const filteredClients = clients.filter((client: Client) => 
+  const filteredClients = (clients as Client[]).filter((client: Client) => 
     searchQuery === "" ||
     client.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     client.description.toLowerCase().includes(searchQuery.toLowerCase())
@@ -33,7 +33,7 @@ const Clients = () => {
   
   // Get tasks count for each client
   const getClientTasksCount = (clientId: string) => {
-    return allTasks.filter(task => task.clientId === clientId).length;
+    return (allTasks as Task[]).filter(task => task.clientId === clientId).length;
   };
   
   return (

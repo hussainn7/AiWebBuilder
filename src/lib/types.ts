@@ -73,3 +73,12 @@ export interface TasksByStatus {
   completed: Task[];
   canceled: Task[];
 }
+
+export interface Note {
+  id: string;
+  title: string;
+  content: string;
+  createdAt: string;
+  entityId?: string;
+  entityType?: 'client' | 'project' | 'task';
+}

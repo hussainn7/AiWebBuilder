@@ -1,17 +1,29 @@
 
-import { MainLayout } from "@/components/MainLayout";
 import { useState } from "react";
-import { clients, getEnhancedTasks } from "@/lib/mock-data";
-import { Client } from "@/lib/types";
+import { MainLayout } from "@/components/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ExternalLink, Plus, Search } from "lucide-react";
+import { ClientForm } from "@/components/ClientForm";
+import { useQuery } from "@tanstack/react-query";
+import { getClients, getEnhancedTasks } from "@/lib/mock-data";
+import { Client } from "@/lib/types";
 
 const Clients = () => {
   const [searchQuery, setSearchQuery] = useState("");
-  const allTasks = getEnhancedTasks();
+  const [dialogOpen, setDialogOpen] = useState(false);
+  
+  const { data: clients = [] } = useQuery({
+    queryKey: ["clients"],
+    queryFn: getClients
+  });
+  
+  const { data: allTasks = [] } = useQuery({
+    queryKey: ["enhanced-tasks"],
+    queryFn: getEnhancedTasks
+  });
   
   // Filter clients based on search query
   const filteredClients = clients.filter(client => 
@@ -38,7 +50,7 @@ const Clients = () => {
           />
         </div>
         
-        <Button className="w-full sm:w-auto gap-1">
+        <Button className="w-full sm:w-auto gap-1" onClick={() => setDialogOpen(true)}>
           <Plus className="h-4 w-4" /> Добавить клиента
         </Button>
       </div>
@@ -59,6 +71,8 @@ const Clients = () => {
           </div>
         )}
       </div>
+      
+      <ClientForm open={dialogOpen} onOpenChange={setDialogOpen} />
     </MainLayout>
   );
 };

@@ -2,13 +2,16 @@
 import React from "react";
 import { MainNav } from "./MainNav";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { cn } from "@/lib/utils";
+import Notes from "./Notes";
 
 interface MainLayoutProps {
   children: React.ReactNode;
   title?: string;
+  showNotes?: boolean;
 }
 
-export function MainLayout({ children, title }: MainLayoutProps) {
+export function MainLayout({ children, title, showNotes = false }: MainLayoutProps) {
   const isMobile = useIsMobile();
   
   return (
@@ -22,8 +25,14 @@ export function MainLayout({ children, title }: MainLayoutProps) {
           </header>
         )}
         
-        <main className="flex-1 p-3 md:p-6 animate-fade-in">
+        <main className="flex-1 p-3 md:p-6 animate-fade-in flex flex-col gap-8">
           {children}
+          
+          {showNotes && (
+            <div className="mt-8">
+              <Notes />
+            </div>
+          )}
         </main>
       </div>
     </div>

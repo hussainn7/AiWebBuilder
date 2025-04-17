@@ -11,14 +11,30 @@ import { Task, Status, User } from "@/lib/types";
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { ChevronDown, Plus, Search } from "lucide-react";
 import UserAvatar from "@/components/UserAvatar";
+import { TaskForm } from "@/components/TaskForm";
+import { useQuery } from "@tanstack/react-query";
 
 const Tasks = () => {
-  const allTasks = getEnhancedTasks();
-  const tasksByStatus = getTasksByStatus();
+  const { data: allTasks = [] } = useQuery({
+    queryKey: ["enhanced-tasks"],
+    queryFn: getEnhancedTasks
+  });
+
+  const { data: tasksByStatus = {
+    draft: [],
+    'in-progress': [],
+    'under-review': [],
+    completed: [],
+    canceled: []
+  } } = useQuery({
+    queryKey: ["tasks-by-status"],
+    queryFn: getTasksByStatus
+  });
   
   const [view, setView] = useState<"kanban" | "list">("kanban");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
+  const [dialogOpen, setDialogOpen] = useState(false);
   
   // Filter tasks based on search query and selected users
   const filteredTasks = allTasks.filter(task => {
@@ -102,7 +118,7 @@ const Tasks = () => {
             </TabsList>
           </Tabs>
           
-          <Button className="gap-1">
+          <Button className="gap-1" onClick={() => setDialogOpen(true)}>
             <Plus className="h-4 w-4" /> Новая задача
           </Button>
         </div>
@@ -123,6 +139,8 @@ const Tasks = () => {
           )}
         </div>
       )}
+      
+      <TaskForm open={dialogOpen} onOpenChange={setDialogOpen} />
     </MainLayout>
   );
 };

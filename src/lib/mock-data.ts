@@ -1,5 +1,4 @@
-
-import { User, Task, Client, Project, Comment, SubTask } from './types';
+import { Task, Client, Project, User, TasksByStatus } from './types';
 
 // Mock Users
 export const users: User[] = [
@@ -341,3 +340,16 @@ export const getEnhancedTasks = () => {
     return task;
   });
 };
+
+// Add functions to support adding new entities to mock data
+export function addClientToMockData(newClient: Client) {
+  clients.push(newClient);
+}
+
+export function addProjectToMockData(newProject: Project) {
+  projects.push(newProject);
+}
+
+export function addTaskToMockData(newTask: Task) {
+  tasks.push(newTask);
+}

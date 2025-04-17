@@ -1,18 +1,30 @@
 
 import { useState } from "react";
 import { MainLayout } from "@/components/MainLayout";
-import { projects, getEnhancedTasks, getClientById } from "@/lib/mock-data";
-import { Project } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Calendar as CalendarIcon, Plus, Search } from "lucide-react";
+import { ProjectForm } from "@/components/ProjectForm";
+import { useQuery } from "@tanstack/react-query";
+import { getProjects, getEnhancedTasks, getClientById } from "@/lib/mock-data";
+import { Project } from "@/lib/types";
 import { format } from "date-fns";
 
 const Projects = () => {
   const [searchQuery, setSearchQuery] = useState("");
-  const allTasks = getEnhancedTasks();
+  const [dialogOpen, setDialogOpen] = useState(false);
+  
+  const { data: projects = [] } = useQuery({
+    queryKey: ["projects"],
+    queryFn: getProjects
+  });
+  
+  const { data: allTasks = [] } = useQuery({
+    queryKey: ["enhanced-tasks"],
+    queryFn: getEnhancedTasks
+  });
   
   // Filter projects based on search query
   const filteredProjects = projects.filter(project => 
@@ -39,7 +51,7 @@ const Projects = () => {
           />
         </div>
         
-        <Button className="w-full sm:w-auto gap-1">
+        <Button className="w-full sm:w-auto gap-1" onClick={() => setDialogOpen(true)}>
           <Plus className="h-4 w-4" /> Добавить проект
         </Button>
       </div>
@@ -60,6 +72,8 @@ const Projects = () => {
           </div>
         )}
       </div>
+      
+      <ProjectForm open={dialogOpen} onOpenChange={setDialogOpen} />
     </MainLayout>
   );
 };

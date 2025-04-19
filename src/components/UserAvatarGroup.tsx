@@ -1,13 +1,12 @@
-
 import { User } from "@/lib/types";
 import UserAvatar from "./UserAvatar";
 
 interface UserAvatarGroupProps {
-  users: User[];
+  users?: User[];
   max?: number;
 }
 
-const UserAvatarGroup = ({ users, max = 3 }: UserAvatarGroupProps) => {
+const UserAvatarGroup = ({ users = [], max = 3 }: UserAvatarGroupProps) => {
   const visibleUsers = users.slice(0, max);
   const remainingCount = users.length - max;
 

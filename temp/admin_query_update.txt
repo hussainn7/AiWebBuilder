@@ -1,0 +1,17 @@
+  // Fetch users
+  const { data: users = [], isLoading: isLoadingUsers } = useQuery({
+    queryKey: ['admin-users'],
+    queryFn: async () => {
+      const response = await fetch('http://localhost:5000/api/admin/users', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (!response.ok) throw new Error('Failed to fetch users');
+      return response.json();
+    },
+    enabled: !!token,
+    refetchInterval: 3000, // Refetch every 3 seconds
+    refetchOnWindowFocus: true, // Refetch when window regains focus
+    staleTime: 0 // Consider data stale immediately
+  });

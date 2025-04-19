@@ -7,27 +7,31 @@ import { Badge } from "@/components/ui/badge";
 import { Calendar as CalendarIcon, Plus, Search } from "lucide-react";
 import { ProjectForm } from "@/components/ProjectForm";
 import { useQuery } from "@tanstack/react-query";
-import { getProjects, getEnhancedTasks } from "@/lib/api-utils";
-import { getClientById } from "@/lib/mock-data";
+import { getProjects, getEnhancedTasks, getProjectsWithClients } from "@/lib/api-utils";
 import { Project, Task } from "@/lib/types";
 import { format } from "date-fns";
+import { ru } from "date-fns/locale";
+import { useAuth } from "@/contexts/AuthContext";
 
 const Projects = () => {
+  const { token } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   
-  const { data: projects = [] } = useQuery({
-    queryKey: ["projects"],
-    queryFn: getProjects
+  const { data: projects = [], isLoading: projectsLoading } = useQuery({
+    queryKey: ["projects-with-clients"],
+    queryFn: () => getProjectsWithClients(token),
+    enabled: !!token
   });
   
-  const { data: allTasks = [] } = useQuery({
+  const { data: allTasks = [], isLoading: tasksLoading } = useQuery({
     queryKey: ["enhanced-tasks"],
-    queryFn: getEnhancedTasks
+    queryFn: () => getEnhancedTasks(token),
+    enabled: !!token
   });
   
   // Filter projects based on search query
-  const filteredProjects = (projects as Project[]).filter((project: Project) => 
+  const filteredProjects = projects.filter((project: Project) => 
     searchQuery === "" ||
     project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     project.description.toLowerCase().includes(searchQuery.toLowerCase())
@@ -35,8 +39,18 @@ const Projects = () => {
   
   // Get tasks count for each project
   const getProjectTasksCount = (projectId: string) => {
-    return (allTasks as Task[]).filter(task => task.projectId === projectId).length;
+    return allTasks.filter(task => task.projectId === projectId).length;
   };
+  
+  if (projectsLoading || tasksLoading) {
+    return (
+      <MainLayout title="Проекты">
+        <div className="flex items-center justify-center h-64">
+          <p className="text-muted-foreground">Загрузка проектов...</p>
+        </div>
+      </MainLayout>
+    );
+  }
   
   return (
     <MainLayout title="Проекты">
@@ -84,8 +98,6 @@ interface ProjectCardProps {
 }
 
 const ProjectCard = ({ project, tasksCount }: ProjectCardProps) => {
-  const client = getClientById(project.clientId);
-  
   // Status color mapping
   const statusColors = {
     'active': 'default',
@@ -104,7 +116,7 @@ const ProjectCard = ({ project, tasksCount }: ProjectCardProps) => {
   const formatDate = (dateString: string) => {
     try {
       const date = new Date(dateString);
-      return format(date, "dd.MM.yyyy");
+      return format(date, "dd MMM yyyy", { locale: ru });
     } catch (error) {
       return "Нет даты";
     }
@@ -117,7 +129,7 @@ const ProjectCard = ({ project, tasksCount }: ProjectCardProps) => {
           <div>
             <CardTitle>{project.name}</CardTitle>
             <CardDescription>
-              {client ? `Клиент: ${client.name}` : "Без клиента"}
+              {project.client ? `Клиент: ${project.client.name}` : "Без клиента"}
             </CardDescription>
           </div>
           <Badge variant={statusColors[project.status] as any}>
@@ -138,7 +150,7 @@ const ProjectCard = ({ project, tasksCount }: ProjectCardProps) => {
           {project.endDate && (
             <div className="flex items-center gap-2 text-muted-foreground">
               <CalendarIcon className="h-4 w-4" />
-              <span>Завершение: {formatDate(project.endDate)}</span>
+              <span>Конец: {formatDate(project.endDate)}</span>
             </div>
           )}
         </div>
@@ -146,11 +158,11 @@ const ProjectCard = ({ project, tasksCount }: ProjectCardProps) => {
       
       <CardFooter className="flex justify-between border-t pt-4">
         <span className="text-sm text-muted-foreground">
-          {tasksCount} задач{tasksCount !== 1 && 'и'}
+          {tasksCount} {tasksCount === 1 ? 'задача' : tasksCount > 1 && tasksCount < 5 ? 'задачи' : 'задач'}
         </span>
         
         <div className="space-x-2">
-          <Button variant="outline" size="sm">Подробнее</Button>
+          <Button variant="outline" size="sm">Детали</Button>
           <Button variant="outline" size="sm">Задачи</Button>
         </div>
       </CardFooter>

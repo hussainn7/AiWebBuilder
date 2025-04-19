@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd";
 import { Task, TasksByStatus, Status } from "@/lib/types";
@@ -91,7 +90,7 @@ const KanbanBoard = ({ tasks, onTaskMove }: KanbanBoardProps) => {
 
   return (
     <DragDropContext onDragEnd={handleDragEnd}>
-      <div className="flex gap-4 overflow-x-auto pb-6">
+      <div className="flex gap-4 overflow-x-auto pb-6 relative z-10">
         {statuses.map(status => (
           <KanbanColumn
             key={status}

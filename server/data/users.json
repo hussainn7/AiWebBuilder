@@ -1,0 +1,22 @@
+[
+  {
+    "id": "1",
+    "email": "admin@gmail.com",
+    "firstName": "Admin",
+    "lastName": "User",
+    "password": "admin123",
+    "role": "admin",
+    "profilePicture": "https://ui-avatars.com/api/?name=Admin+User",
+    "notifications": []
+  },
+  {
+    "id": "2",
+    "firstName": "Hus",
+    "lastName": "S",
+    "email": "tester@gmail.com",
+    "password": "tester@gmail.com",
+    "role": "employee",
+    "profilePicture": "https://ui-avatars.com/api/?name=Hus+S",
+    "notifications": []
+  }
+]

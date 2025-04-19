@@ -1,10 +1,9 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { MainLayout } from "@/components/MainLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { getEnhancedTasks, getTasksByStatus, users } from "@/lib/mock-data";
+import { getEnhancedTasks, getTasks, getUsers } from "@/lib/api-utils";
 import TaskCard from "@/components/TaskCard";
 import KanbanBoard from "@/components/KanbanBoard";
 import { Task, Status, User } from "@/lib/types";
@@ -12,29 +11,74 @@ import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMe
 import { ChevronDown, Plus, Search } from "lucide-react";
 import UserAvatar from "@/components/UserAvatar";
 import { TaskForm } from "@/components/TaskForm";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/contexts/AuthContext";
 
 const Tasks = () => {
-  const { data: allTasks = [] } = useQuery({
+  const { token } = useAuth();
+  const queryClient = useQueryClient();
+  
+  // Fetch all tasks
+  const { data: allTasks = [], refetch: refetchTasks } = useQuery({
     queryKey: ["enhanced-tasks"],
-    queryFn: getEnhancedTasks
+    queryFn: () => getEnhancedTasks(token),
+    enabled: !!token,
+    // Refresh data every 10 seconds instead of 5
+    refetchInterval: 10000,
+    // Don't refetch when window is not focused
+    refetchIntervalInBackground: false,
+    // Add stale time to prevent unnecessary refetches
+    staleTime: 5000
   });
 
-  const { data: tasksByStatus = {
-    draft: [],
-    'in-progress': [],
-    'under-review': [],
-    completed: [],
-    canceled: []
-  } } = useQuery({
-    queryKey: ["tasks-by-status"],
-    queryFn: getTasksByStatus
+  // Fetch users from the server
+  const { data: users = [], isLoading: usersLoading, refetch: refetchUsers } = useQuery({
+    queryKey: ["users"],
+    queryFn: () => getUsers(token),
+    enabled: !!token,
+    // Refresh user data less frequently
+    refetchInterval: 30000,
+    // Add stale time to prevent unnecessary refetches
+    staleTime: 20000
   });
-  
+
+  // Local state
   const [view, setView] = useState<"kanban" | "list">("kanban");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
+  
+  // Force refresh when dialog closes
+  const handleDialogOpenChange = (open: boolean) => {
+    setDialogOpen(open);
+    if (!open) {
+      // Immediate refresh when dialog closes
+      setTimeout(() => {
+        refetchTasks();
+        refetchUsers();
+        // Also invalidate all related queries
+        queryClient.invalidateQueries({ queryKey: ["tasks"] });
+        queryClient.invalidateQueries({ queryKey: ["users"] });
+      }, 500); // Small delay to ensure server has processed the changes
+    }
+  };
+  
+  // Setup effect to periodically refresh data
+  useEffect(() => {
+    // Initial data load
+    refetchTasks();
+    refetchUsers();
+    
+    // Set up a refresh interval
+    const refreshInterval = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        refetchTasks();
+      }
+    }, 3000); // Refresh every 3 seconds when tab is visible
+    
+    // Clean up interval on component unmount
+    return () => clearInterval(refreshInterval);
+  }, [refetchTasks, refetchUsers]);
   
   // Filter tasks based on search query and selected users
   const filteredTasks = allTasks.filter(task => {
@@ -45,7 +89,7 @@ const Tasks = () => {
     
     // Filter by selected users
     const matchesUsers = selectedUsers.length === 0 ||
-      task.assignees.some(user => selectedUsers.includes(user.id));
+      (task.assignees && task.assignees.some(user => selectedUsers.includes(user.id)));
     
     return matchesQuery && matchesUsers;
   });
@@ -95,17 +139,27 @@ const Tasks = () => {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
-              {users.map((user) => (
-                <DropdownMenuCheckboxItem
-                  key={user.id}
-                  checked={selectedUsers.includes(user.id)}
-                  onCheckedChange={() => toggleUserSelection(user.id)}
-                  className="flex items-center gap-2"
-                >
-                  <UserAvatar user={user} size="sm" />
-                  {user.name}
-                </DropdownMenuCheckboxItem>
-              ))}
+              {usersLoading ? (
+                <div className="p-2 text-center text-sm text-muted-foreground">
+                  Загрузка пользователей...
+                </div>
+              ) : users.length > 0 ? (
+                users.map((user) => (
+                  <DropdownMenuCheckboxItem
+                    key={user.id}
+                    checked={selectedUsers.includes(user.id)}
+                    onCheckedChange={() => toggleUserSelection(user.id)}
+                    className="flex items-center gap-2"
+                  >
+                    <UserAvatar user={user} size="sm" />
+                    {user.name}
+                  </DropdownMenuCheckboxItem>
+                ))
+              ) : (
+                <div className="p-2 text-center text-sm text-muted-foreground">
+                  Нет доступных пользователей
+                </div>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -140,7 +194,7 @@ const Tasks = () => {
         </div>
       )}
       
-      <TaskForm open={dialogOpen} onOpenChange={setDialogOpen} />
+      <TaskForm open={dialogOpen} onOpenChange={handleDialogOpenChange} />
     </MainLayout>
   );
 };

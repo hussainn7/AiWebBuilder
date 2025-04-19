@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { 
@@ -9,11 +8,13 @@ import {
   Calendar, 
   BarChart3, 
   Settings,
+  ShieldCheck,
   Menu, 
   X 
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface NavItemProps {
   icon: React.ElementType;
@@ -42,17 +43,21 @@ const NavItem = ({ icon: Icon, href, label, isActive }: NavItemProps) => {
 export function MainNav() {
   const [isOpen, setIsOpen] = useState(false);
   const pathname = window.location.pathname;
+  const { user } = useAuth();
 
   const toggleMenu = () => setIsOpen(!isOpen);
 
   const navItems = [
-    { icon: LayoutDashboard, href: "/", label: "Дашборд" },
-    { icon: CheckSquare, href: "/tasks", label: "Задачи" },
-    { icon: Users, href: "/clients", label: "Клиенты" },
-    { icon: Briefcase, href: "/projects", label: "Проекты" },
-    { icon: Calendar, href: "/calendar", label: "Календарь" },
-    { icon: BarChart3, href: "/analytics", label: "Аналитика" },
-    { icon: Settings, href: "/settings", label: "Настройки" },
+    { icon: LayoutDashboard, href: "/dashboard", label: "Dashboard" },
+    { icon: CheckSquare, href: "/tasks", label: "Tasks" },
+    { icon: Users, href: "/clients", label: "Clients" },
+    { icon: Briefcase, href: "/projects", label: "Projects" },
+    { icon: Calendar, href: "/calendar", label: "Calendar" },
+    { icon: BarChart3, href: "/analytics", label: "Analytics" },
+    ...(user?.role === 'admin' ? [
+      { icon: Settings, href: "/settings", label: "Settings" },
+      { icon: ShieldCheck, href: "/admin", label: "Admin" }
+    ] : []),
   ];
 
   return (

@@ -1,4 +1,3 @@
-
 export type Status = 'draft' | 'in-progress' | 'under-review' | 'completed' | 'canceled';
 
 export interface User {
@@ -61,6 +60,7 @@ export interface Project {
   name: string;
   description: string;
   clientId: string;
+  client?: Client;
   status: 'active' | 'completed' | 'on-hold';
   startDate: string;
   endDate?: string;

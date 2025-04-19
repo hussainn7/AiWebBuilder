@@ -1,6 +1,8 @@
 import { v4 as uuidv4 } from 'uuid';
-import { clients, projects, users, addClientToMockData, addProjectToMockData, addTaskToMockData, tasks, getClientById, getProjectById } from './mock-data';
 import { Client, Project, Task, Status, SubTask } from './types';
+import { useAuth } from '@/contexts/AuthContext';
+
+const API_BASE_URL = 'http://localhost:5000/api';
 
 // Local storage keys
 const NOTES_KEY = 'task_pulse_notes';
@@ -18,89 +20,120 @@ interface Note {
   entityType?: 'client' | 'project' | 'task';
 }
 
+// Helper function to get auth headers
+const getAuthHeaders = (token: string) => ({
+  'Content-Type': 'application/json',
+  'Authorization': `Bearer ${token}`
+});
+
 // Get clients
-export const getClients = async (): Promise<Client[]> => {
-  // Check if we have saved clients in localStorage
-  const savedClients = localStorage.getItem(CLIENTS_KEY);
-  if (savedClients) {
-    return JSON.parse(savedClients);
+export const getClients = async (token: string): Promise<Client[]> => {
+  const response = await fetch(`${API_BASE_URL}/clients`, {
+    headers: getAuthHeaders(token)
+  });
+  
+  if (!response.ok) {
+    throw new Error('Failed to fetch clients');
   }
   
-  // If not, return mock data
-  return clients;
+  return response.json();
 };
 
 // Add client
-export const addClient = async (clientData: Omit<Client, 'id'>): Promise<Client> => {
-  const newClient: Client = {
-    id: uuidv4(),
-    ...clientData
-  };
+export const addClient = async (clientData: Omit<Client, 'id'>, token: string): Promise<Client> => {
+  const response = await fetch(`${API_BASE_URL}/clients`, {
+    method: 'POST',
+    headers: getAuthHeaders(token),
+    body: JSON.stringify(clientData)
+  });
   
-  // Get existing clients
-  const existingClients = await getClients();
+  if (!response.ok) {
+    throw new Error('Failed to add client');
+  }
   
-  // Add new client to the list
-  const updatedClients = [...existingClients, newClient];
-  
-  // Save to localStorage
-  localStorage.setItem(CLIENTS_KEY, JSON.stringify(updatedClients));
-  
-  // Also update mock data for this session
-  addClientToMockData(newClient);
-  
-  return newClient;
+  return response.json();
 };
 
 // Get projects
-export const getProjects = async (): Promise<Project[]> => {
-  // Check if we have saved projects in localStorage
-  const savedProjects = localStorage.getItem(PROJECTS_KEY);
-  if (savedProjects) {
-    return JSON.parse(savedProjects);
+export const getProjects = async (token: string): Promise<Project[]> => {
+  const response = await fetch(`${API_BASE_URL}/projects`, {
+    headers: getAuthHeaders(token)
+  });
+  
+  if (!response.ok) {
+    throw new Error('Failed to fetch projects');
   }
   
-  // If not, return mock data
-  return projects;
+  return response.json();
 };
 
 // Add project
-export const addProject = async (projectData: Omit<Project, 'id'>): Promise<Project> => {
-  const newProject: Project = {
-    id: uuidv4(),
-    ...projectData
-  };
+export const addProject = async (projectData: Omit<Project, 'id'>, token: string): Promise<Project> => {
+  const response = await fetch(`${API_BASE_URL}/projects`, {
+    method: 'POST',
+    headers: getAuthHeaders(token),
+    body: JSON.stringify(projectData)
+  });
   
-  // Get existing projects
-  const existingProjects = await getProjects();
+  if (!response.ok) {
+    throw new Error('Failed to add project');
+  }
   
-  // Add new project to the list
-  const updatedProjects = [...existingProjects, newProject];
-  
-  // Save to localStorage
-  localStorage.setItem(PROJECTS_KEY, JSON.stringify(updatedProjects));
-  
-  // Also update mock data for this session
-  addProjectToMockData(newProject);
-  
-  return newProject;
+  return response.json();
 };
 
-// Get users (for now we just return mock data since users are not editable in this MVP)
-export const getUsers = async () => {
-  return users;
+// Get users from the server
+export const getUsers = async (token?: string) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/users`, {
+      headers: token ? getAuthHeaders(token) : {}
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch users');
+    }
+    
+    const users = await response.json();
+    return users.map((user: any) => ({
+      id: user.id,
+      name: `${user.firstName || ''} ${user.lastName || ''}`.trim(),
+      email: user.email,
+      role: user.role === 'admin' ? 'team-lead' : 'employee', // Map admin to team-lead for compatibility
+      avatar: user.profilePicture || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.firstName || '')}+${encodeURIComponent(user.lastName || '')}`
+    }));
+  } catch (error) {
+    console.error("Error fetching users:", error);
+    // Fallback to mock data if server request fails
+    return [
+      { 
+        id: '1', 
+        name: 'Admin User', 
+        email: 'admin@gmail.com', 
+        role: 'team-lead' as const,
+        avatar: 'https://ui-avatars.com/api/?name=Admin+User'
+      },
+      { 
+        id: '2', 
+        name: 'Hus S', 
+        email: 'tester@gmail.com', 
+        role: 'employee' as const,
+        avatar: 'https://ui-avatars.com/api/?name=Hus+S'
+      }
+    ];
+  }
 };
 
 // Get tasks
-export const getTasks = async (): Promise<Task[]> => {
-  // Check if we have saved tasks in localStorage
-  const savedTasks = localStorage.getItem(TASKS_KEY);
-  if (savedTasks) {
-    return JSON.parse(savedTasks);
+export const getTasks = async (token: string): Promise<Task[]> => {
+  const response = await fetch(`${API_BASE_URL}/tasks`, {
+    headers: getAuthHeaders(token)
+  });
+  
+  if (!response.ok) {
+    throw new Error('Failed to fetch tasks');
   }
   
-  // If not, use the mock-data function
-  return tasks;
+  return response.json();
 };
 
 // Add task
@@ -115,55 +148,18 @@ export interface TaskInput {
   subtasks: { title: string; completed: boolean }[];
 }
 
-export const addTask = async (taskData: TaskInput): Promise<Task> => {
-  const now = new Date().toISOString();
-  const creatorId = users[0].id; // Using first user as creator for now
+export const addTask = async (taskData: TaskInput, token: string): Promise<Task> => {
+  const response = await fetch(`${API_BASE_URL}/tasks`, {
+    method: 'POST',
+    headers: getAuthHeaders(token),
+    body: JSON.stringify(taskData)
+  });
   
-  // Convert assigneeIds to actual user objects
-  const assignees = users.filter(user => taskData.assigneeIds.includes(user.id));
+  if (!response.ok) {
+    throw new Error('Failed to add task');
+  }
   
-  // Create new task
-  const newTask: Task = {
-    id: uuidv4(),
-    title: taskData.title,
-    description: taskData.description,
-    status: taskData.status,
-    dueDate: taskData.dueDate,
-    assignees: assignees,
-    createdBy: creatorId,
-    clientId: taskData.clientId,
-    projectId: taskData.projectId,
-    subTasks: taskData.subtasks.map(st => ({ 
-      id: uuidv4(), 
-      title: st.title, 
-      completed: st.completed 
-    })),
-    comments: [],
-    attachments: [],
-    createdAt: now,
-    updatedAt: now,
-    editHistory: [
-      {
-        userId: creatorId,
-        timestamp: now,
-        changes: 'Создание задачи'
-      }
-    ]
-  };
-  
-  // Get existing tasks
-  const existingTasks = await getTasks();
-  
-  // Add new task to the list
-  const updatedTasks = [...existingTasks, newTask];
-  
-  // Save to localStorage
-  localStorage.setItem(TASKS_KEY, JSON.stringify(updatedTasks));
-  
-  // Also update mock data for this session
-  addTaskToMockData(newTask);
-  
-  return newTask;
+  return response.json();
 };
 
 // Get notes
@@ -213,20 +209,175 @@ export const deleteNote = async (noteId: string): Promise<void> => {
   localStorage.setItem(NOTES_KEY, JSON.stringify(updatedNotes));
 };
 
-// Helper to get task with related data
-export const getEnhancedTasks = async () => {
-  const allTasks = await getTasks();
-  
-  return allTasks.map(task => {
-    // Add client and project objects
-    if (task.clientId) {
-      task.client = getClientById(task.clientId);
+// Get enhanced tasks with related data
+export const getEnhancedTasks = async (token: string) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/enhanced-tasks`, {
+      headers: getAuthHeaders(token)
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch enhanced tasks');
     }
     
-    if (task.projectId) {
-      task.project = getProjectById(task.projectId);
-    }
+    return response.json();
+  } catch (error) {
+    console.error("Error fetching enhanced tasks:", error);
+    // Fallback to regular tasks if enhanced endpoint fails
+    const tasks = await getTasks(token);
+    return tasks;
+  }
+};
+
+// Get calendar events
+export const getCalendarEvents = async (token: string) => {
+  try {
+    // Get all tasks directly from the tasks endpoint
+    const tasks = await getTasks(token);
     
-    return task;
+    return tasks.map(task => ({
+      id: task.id,
+      title: task.title,
+      start: task.dueDate,
+      end: task.dueDate,
+      status: task.status
+    }));
+  } catch (error) {
+    console.error("Error fetching calendar events:", error);
+    return [];
+  }
+};
+
+// Get analytics data
+export const getAnalyticsData = async (token: string) => {
+  const response = await fetch(`${API_BASE_URL}/analytics`, {
+    headers: getAuthHeaders(token)
   });
+  
+  if (!response.ok) {
+    throw new Error('Failed to fetch analytics data');
+  }
+  
+  return response.json();
+};
+
+// Get projects with client data
+export const getProjectsWithClients = async (token: string): Promise<Project[]> => {
+  const response = await fetch(`${API_BASE_URL}/projects`, {
+    headers: getAuthHeaders(token)
+  });
+  
+  if (!response.ok) {
+    throw new Error('Failed to fetch projects');
+  }
+  
+  const projects = await response.json();
+  const clients = await getClients(token);
+  
+  // Enhance projects with client data
+  return projects.map((project: Project) => ({
+    ...project,
+    client: project.clientId ? clients.find((c: Client) => c.id === project.clientId) : undefined
+  }));
+};
+
+// Link task to client and project
+export const linkTaskToClientAndProject = async (
+  taskId: string,
+  clientId: string,
+  token: string,
+  projectId?: string
+): Promise<Task> => {
+  const response = await fetch(`${API_BASE_URL}/tasks/${taskId}`, {
+    method: 'PUT',
+    headers: getAuthHeaders(token),
+    body: JSON.stringify({ clientId, projectId })
+  });
+  
+  if (!response.ok) {
+    throw new Error('Failed to link task');
+  }
+  
+  return response.json();
+};
+
+// Get tasks by client
+export const getTasksByClient = async (clientId: string, token: string): Promise<Task[]> => {
+  const allTasks = await getEnhancedTasks(token);
+  return allTasks.filter((task: Task) => task.clientId === clientId);
+};
+
+// Get tasks by project
+export const getTasksByProject = async (projectId: string, token: string): Promise<Task[]> => {
+  const allTasks = await getEnhancedTasks(token);
+  return allTasks.filter((task: Task) => task.projectId === projectId);
+};
+
+// Get client details with related data
+export const getClientDetails = async (clientId: string, token: string): Promise<any> => {
+  const [client, allTasks, allProjects] = await Promise.all([
+    getClientById(clientId, token),
+    getEnhancedTasks(token),
+    getProjects(token)
+  ]);
+  
+  const clientTasks = allTasks.filter((task: Task) => task.clientId === clientId);
+  const clientProjects = allProjects.filter((project: Project) => project.clientId === clientId);
+  
+  // Group tasks by project
+  const tasksByProject = clientTasks.reduce((acc: Record<string, Task[]>, task: Task) => {
+    const projectId = task.projectId || 'no-project';
+    if (!acc[projectId]) {
+      acc[projectId] = [];
+    }
+    acc[projectId].push(task);
+    return acc;
+  }, {});
+  
+  return {
+    client,
+    tasks: clientTasks,
+    projects: clientProjects,
+    tasksByProject
+  };
+};
+
+// Get client by ID
+export const getClientById = async (clientId: string, token: string): Promise<Client> => {
+  const response = await fetch(`${API_BASE_URL}/clients/${clientId}`, {
+    headers: getAuthHeaders(token)
+  });
+  
+  if (!response.ok) {
+    throw new Error('Failed to fetch client');
+  }
+  
+  return response.json();
+};
+
+// Get tasks by status
+export const getTasksByStatus = async (token: string) => {
+  try {
+    const tasks = await getTasks(token);
+    
+    // Group tasks by status
+    const result = {
+      draft: tasks.filter(task => task.status === 'draft'),
+      'in-progress': tasks.filter(task => task.status === 'in-progress'),
+      'under-review': tasks.filter(task => task.status === 'under-review'),
+      completed: tasks.filter(task => task.status === 'completed'),
+      canceled: tasks.filter(task => task.status === 'canceled')
+    };
+    
+    return result;
+  } catch (error) {
+    console.error("Error fetching tasks by status:", error);
+    return {
+      draft: [],
+      'in-progress': [],
+      'under-review': [],
+      completed: [],
+      canceled: []
+    };
+  }
 };

@@ -31,7 +31,7 @@ const Profile = () => {
     setLoading(true);
 
     try {
-      const response = await fetch('http://localhost:5000/api/profile', {
+      const response = await fetch('http://localhost:5001/api/profile', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

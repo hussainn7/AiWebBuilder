@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { 
   LayoutDashboard, 
   CheckSquare, 
@@ -10,20 +10,41 @@ import {
   Settings,
   ShieldCheck,
   Menu, 
-  X 
+  X,
+  LogOut
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
+import { NotificationCenter } from "@/components/ui/notifications";
 
 interface NavItemProps {
   icon: React.ElementType;
   href: string;
   label: string;
   isActive?: boolean;
+  onClick?: () => void;
 }
 
-const NavItem = ({ icon: Icon, href, label, isActive }: NavItemProps) => {
+const NavItem = ({ icon: Icon, href, label, isActive, onClick }: NavItemProps) => {
+  if (onClick) {
+    return (
+      <button 
+        onClick={onClick}
+        className={cn(
+          "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors w-full text-left",
+          isActive 
+            ? "bg-sidebar-accent text-sidebar-accent-foreground" 
+            : "text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50"
+        )}
+      >
+        <Icon className="h-5 w-5" />
+        <span>{label}</span>
+      </button>
+    );
+  }
+  
   return (
     <Link 
       to={href} 
@@ -43,9 +64,16 @@ const NavItem = ({ icon: Icon, href, label, isActive }: NavItemProps) => {
 export function MainNav() {
   const [isOpen, setIsOpen] = useState(false);
   const pathname = window.location.pathname;
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
 
   const toggleMenu = () => setIsOpen(!isOpen);
+  
+  const handleLogout = () => {
+    logout();
+    toast.success("You have been signed out successfully");
+    navigate("/login");
+  };
 
   const navItems = [
     { icon: LayoutDashboard, href: "/dashboard", label: "Dashboard" },
@@ -54,8 +82,8 @@ export function MainNav() {
     { icon: Briefcase, href: "/projects", label: "Projects" },
     { icon: Calendar, href: "/calendar", label: "Calendar" },
     { icon: BarChart3, href: "/analytics", label: "Analytics" },
+    { icon: Settings, href: "/settings", label: "Settings" },
     ...(user?.role === 'admin' ? [
-      { icon: Settings, href: "/settings", label: "Settings" },
       { icon: ShieldCheck, href: "/admin", label: "Admin" }
     ] : []),
   ];
@@ -71,6 +99,11 @@ export function MainNav() {
       >
         {isOpen ? <X /> : <Menu />}
       </Button>
+
+      {/* Notification center for mobile */}
+      <div className="md:hidden fixed top-4 right-16 z-50">
+        <NotificationCenter />
+      </div>
 
       {/* Sidebar for desktop */}
       <div className="hidden md:flex flex-col h-screen w-64 bg-sidebar fixed left-0 top-0 border-r">
@@ -92,6 +125,17 @@ export function MainNav() {
             />
           ))}
         </nav>
+        
+        <div className="px-2 py-4 border-t border-sidebar-accent/50">
+          <div className="flex items-center justify-end mb-3 px-3">
+            <NavItem
+              icon={LogOut}
+              href=""
+              label="Sign Out"
+              onClick={handleLogout}
+            />
+          </div>
+        </div>
       </div>
 
       {/* Mobile sidebar */}
@@ -124,6 +168,17 @@ export function MainNav() {
                 />
               ))}
             </nav>
+            
+            <div className="mt-6 pt-4 border-t border-sidebar-accent/50">
+              <div className="flex items-center justify-between mb-3 px-3">
+                <NavItem
+                  icon={LogOut}
+                  href=""
+                  label="Sign Out"
+                  onClick={handleLogout}
+                />
+              </div>
+            </div>
           </div>
         </div>
       )}

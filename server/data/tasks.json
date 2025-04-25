@@ -1,11 +1,12 @@
 [
   {
     "id": "1",
-    "title": "adad",
-    "description": "ad",
-    "status": "draft",
-    "dueDate": "2025-04-19T05:03:17.185Z",
+    "title": "test",
+    "description": "teetet",
+    "status": "under-review",
+    "dueDate": "2025-05-04T04:00:00.000Z",
     "assigneeIds": [
+      "3",
       "1"
     ],
     "subtasks": [],
@@ -13,439 +14,82 @@
     "comments": [],
     "changeHistory": [
       {
-        "text": "Изменено поле description",
+        "text": "Задача создана/обновлена",
         "author": {
           "id": "1",
           "name": "admin"
         },
-        "timestamp": "2025-04-19T05:03:52.060Z"
-      },
-      {
-        "text": "Изменено поле description",
-        "author": {
-          "id": "1",
-          "name": "admin"
-        },
-        "timestamp": "2025-04-19T05:03:52.181Z"
-      },
-      {
-        "text": "Изменено поле title",
-        "author": {
-          "id": "1",
-          "name": "admin"
-        },
-        "timestamp": "2025-04-19T05:03:52.641Z"
-      },
-      {
-        "text": "Изменено поле title",
-        "author": {
-          "id": "1",
-          "name": "admin"
-        },
-        "timestamp": "2025-04-19T05:03:52.782Z"
-      },
-      {
-        "text": "Изменено поле title",
-        "author": {
-          "id": "1",
-          "name": "admin"
-        },
-        "timestamp": "2025-04-19T05:03:52.881Z"
-      },
-      {
-        "text": "Изменено поле title",
-        "author": {
-          "id": "1",
-          "name": "admin"
-        },
-        "timestamp": "2025-04-19T05:03:52.999Z"
-      },
-      {
-        "text": "Изменено поле assigneeIds",
-        "author": {
-          "id": "1",
-          "name": "admin"
-        },
-        "timestamp": "2025-04-19T05:03:57.590Z"
+        "timestamp": "2025-04-22T23:26:07.718Z"
       }
     ],
     "createdBy": "1",
     "subTasks": [],
     "attachments": [],
-    "createdAt": "2025-04-19T05:04:49.030Z",
-    "updatedAt": "2025-04-19T05:04:49.030Z",
-    "editHistory": []
+    "createdAt": "2025-04-22T23:26:07.726Z",
+    "updatedAt": "2025-04-22T23:37:32.024Z",
+    "editHistory": [
+      {
+        "userId": "1",
+        "timestamp": "2025-04-22T23:37:26.598Z",
+        "changes": "Status"
+      },
+      {
+        "userId": "1",
+        "timestamp": "2025-04-22T23:37:28.081Z",
+        "changes": "Status"
+      },
+      {
+        "userId": "1",
+        "timestamp": "2025-04-22T23:37:29.046Z",
+        "changes": "Status"
+      },
+      {
+        "userId": "1",
+        "timestamp": "2025-04-22T23:37:29.880Z",
+        "changes": "Status"
+      },
+      {
+        "userId": "1",
+        "timestamp": "2025-04-22T23:37:31.322Z",
+        "changes": "Status"
+      },
+      {
+        "userId": "1",
+        "timestamp": "2025-04-22T23:37:32.024Z",
+        "changes": "Status"
+      }
+    ]
   },
   {
     "id": "2",
-    "title": "ax",
-    "description": "axaxax",
-    "status": "in-progress",
-    "dueDate": "2025-04-23T04:00:00.000Z",
-    "assigneeIds": [
-      "1"
-    ],
-    "subtasks": [],
-    "fileAttachments": [],
-    "comments": [],
-    "changeHistory": [
-      {
-        "text": "Изменено поле title",
-        "author": {
-          "id": "1",
-          "name": "admin"
-        },
-        "timestamp": "2025-04-19T05:05:18.766Z"
-      },
-      {
-        "text": "Изменено поле title",
-        "author": {
-          "id": "1",
-          "name": "admin"
-        },
-        "timestamp": "2025-04-19T05:05:18.957Z"
-      },
-      {
-        "text": "Изменено поле description",
-        "author": {
-          "id": "1",
-          "name": "admin"
-        },
-        "timestamp": "2025-04-19T05:05:19.349Z"
-      },
-      {
-        "text": "Изменено поле description",
-        "author": {
-          "id": "1",
-          "name": "admin"
-        },
-        "timestamp": "2025-04-19T05:05:19.466Z"
-      },
-      {
-        "text": "Изменено поле description",
-        "author": {
-          "id": "1",
-          "name": "admin"
-        },
-        "timestamp": "2025-04-19T05:05:19.557Z"
-      },
-      {
-        "text": "Изменено поле description",
-        "author": {
-          "id": "1",
-          "name": "admin"
-        },
-        "timestamp": "2025-04-19T05:05:19.656Z"
-      },
-      {
-        "text": "Изменено поле description",
-        "author": {
-          "id": "1",
-          "name": "admin"
-        },
-        "timestamp": "2025-04-19T05:05:19.772Z"
-      },
-      {
-        "text": "Изменено поле description",
-        "author": {
-          "id": "1",
-          "name": "admin"
-        },
-        "timestamp": "2025-04-19T05:05:19.899Z"
-      },
-      {
-        "text": "Изменено поле status",
-        "author": {
-          "id": "1",
-          "name": "admin"
-        },
-        "timestamp": "2025-04-19T05:05:25.208Z"
-      },
-      {
-        "text": "Изменено поле dueDate",
-        "author": {
-          "id": "1",
-          "name": "admin"
-        },
-        "timestamp": "2025-04-19T05:05:32.840Z"
-      },
-      {
-        "text": "Изменено поле dueDate",
-        "author": {
-          "id": "1",
-          "name": "admin"
-        },
-        "timestamp": "2025-04-19T05:05:34.349Z"
-      },
-      {
-        "text": "Изменено поле dueDate",
-        "author": {
-          "id": "1",
-          "name": "admin"
-        },
-        "timestamp": "2025-04-19T05:05:35.692Z"
-      },
-      {
-        "text": "Изменено поле assigneeIds",
-        "author": {
-          "id": "1",
-          "name": "admin"
-        },
-        "timestamp": "2025-04-19T05:05:43.330Z"
-      }
-    ],
-    "createdBy": "1",
-    "subTasks": [],
-    "attachments": [],
-    "createdAt": "2025-04-19T05:05:46.450Z",
-    "updatedAt": "2025-04-19T05:05:46.450Z",
-    "editHistory": []
-  },
-  {
-    "id": "3",
     "title": "test",
-    "description": "test",
+    "description": "new",
     "status": "draft",
-    "dueDate": "2025-04-23T04:00:00.000Z",
+    "dueDate": "2025-04-22T23:39:54.558Z",
+    "clientId": "1",
+    "projectId": "1",
     "assigneeIds": [
-      "1"
-    ],
-    "subtasks": [
-      {
-        "title": "jaok",
-        "completed": false
-      }
-    ],
-    "fileAttachments": [
-      {
-        "name": "12.1+JFK+%26+LBJ+Foreign+Notes+2022.docx",
-        "path": "/uploads/12.1+JFK+%26+LBJ+Foreign+Notes+2022.docx"
-      }
-    ],
-    "comments": [],
-    "changeHistory": [
-      {
-        "text": "Задача создана/обновлена",
-        "author": {
-          "id": "1",
-          "name": "admin"
-        },
-        "timestamp": "2025-04-19T05:12:51.899Z"
-      }
-    ],
-    "createdBy": "1",
-    "subTasks": [],
-    "attachments": [],
-    "createdAt": "2025-04-19T05:12:51.910Z",
-    "updatedAt": "2025-04-19T05:12:51.910Z",
-    "editHistory": []
-  },
-  {
-    "id": "4",
-    "title": "ad",
-    "description": "test",
-    "status": "draft",
-    "dueDate": "2025-04-21T04:00:00.000Z",
-    "assigneeIds": [
-      "1"
-    ],
-    "subtasks": [],
-    "fileAttachments": [],
-    "comments": [],
-    "changeHistory": [
-      {
-        "text": "Задача создана/обновлена",
-        "author": {
-          "id": "1",
-          "name": "admin"
-        },
-        "timestamp": "2025-04-19T05:19:25.730Z"
-      }
-    ],
-    "createdBy": "1",
-    "subTasks": [],
-    "attachments": [],
-    "createdAt": "2025-04-19T05:19:25.735Z",
-    "updatedAt": "2025-04-19T05:19:25.735Z",
-    "editHistory": []
-  },
-  {
-    "id": "5",
-    "title": "test",
-    "description": "test",
-    "status": "draft",
-    "dueDate": "2025-04-19T05:21:45.934Z",
-    "assigneeIds": [
-      "1"
-    ],
-    "subtasks": [],
-    "fileAttachments": [],
-    "comments": [],
-    "changeHistory": [
-      {
-        "text": "Задача создана/обновлена",
-        "author": {
-          "id": "1",
-          "name": "admin"
-        },
-        "timestamp": "2025-04-19T05:21:58.083Z"
-      }
-    ],
-    "createdBy": "1",
-    "subTasks": [],
-    "attachments": [],
-    "createdAt": "2025-04-19T05:21:58.088Z",
-    "updatedAt": "2025-04-19T05:21:58.088Z",
-    "editHistory": []
-  },
-  {
-    "id": "6",
-    "title": "test",
-    "description": "test",
-    "status": "draft",
-    "dueDate": "2025-04-19T05:23:44.954Z",
-    "assigneeIds": [
-      "1"
-    ],
-    "subtasks": [],
-    "fileAttachments": [],
-    "comments": [],
-    "changeHistory": [
-      {
-        "text": "Задача создана/обновлена",
-        "author": {
-          "id": "1",
-          "name": "admin"
-        },
-        "timestamp": "2025-04-19T05:24:07.203Z"
-      }
-    ],
-    "createdBy": "1",
-    "subTasks": [],
-    "attachments": [],
-    "createdAt": "2025-04-19T05:24:07.208Z",
-    "updatedAt": "2025-04-19T05:24:07.208Z",
-    "editHistory": []
-  },
-  {
-    "id": "7",
-    "title": "test",
-    "description": "test",
-    "status": "draft",
-    "dueDate": "2025-04-24T04:00:00.000Z",
-    "assigneeIds": [
-      "1"
-    ],
-    "subtasks": [],
-    "fileAttachments": [],
-    "comments": [],
-    "changeHistory": [
-      {
-        "text": "Задача создана/обновлена",
-        "author": {
-          "id": "1",
-          "name": "admin"
-        },
-        "timestamp": "2025-04-19T05:29:24.175Z"
-      }
-    ],
-    "createdBy": "1",
-    "subTasks": [],
-    "attachments": [],
-    "createdAt": "2025-04-19T05:29:24.182Z",
-    "updatedAt": "2025-04-19T05:29:24.182Z",
-    "editHistory": []
-  },
-  {
-    "id": "8",
-    "title": "test",
-    "description": "test",
-    "status": "draft",
-    "dueDate": "2025-04-22T04:00:00.000Z",
-    "assigneeIds": [
-      "1"
-    ],
-    "subtasks": [],
-    "fileAttachments": [],
-    "comments": [],
-    "changeHistory": [
-      {
-        "text": "Задача создана/обновлена",
-        "author": {
-          "id": "1",
-          "name": "admin"
-        },
-        "timestamp": "2025-04-19T05:45:22.345Z"
-      }
-    ],
-    "createdBy": "1",
-    "subTasks": [],
-    "attachments": [],
-    "createdAt": "2025-04-19T05:45:22.352Z",
-    "updatedAt": "2025-04-19T05:45:22.352Z",
-    "editHistory": []
-  },
-  {
-    "id": "9",
-    "title": "test",
-    "description": "with HUS",
-    "status": "under-review",
-    "dueDate": "2025-04-22T04:00:00.000Z",
-    "assigneeIds": [
+      "1",
       "2"
     ],
     "subtasks": [],
     "fileAttachments": [],
-    "comments": [],
-    "changeHistory": [
-      {
-        "text": "Задача создана/обновлена",
-        "author": {
-          "id": "1",
-          "name": "admin"
-        },
-        "timestamp": "2025-04-19T06:03:09.160Z"
-      }
-    ],
-    "createdBy": "1",
-    "subTasks": [],
-    "attachments": [],
-    "createdAt": "2025-04-19T06:03:09.169Z",
-    "updatedAt": "2025-04-19T06:03:09.169Z",
-    "editHistory": []
-  },
-  {
-    "id": "10",
-    "title": "Sdelal",
-    "description": "krutooi",
-    "status": "draft",
-    "dueDate": "2025-04-19T06:07:53.044Z",
-    "assigneeIds": [
-      "2"
-    ],
-    "subtasks": [],
-    "fileAttachments": [
-      {
-        "name": "1.jpg",
-        "path": "/uploads/1.jpg"
-      }
-    ],
     "comments": [],
     "changeHistory": [
       {
         "text": "Задача создана/обновлена",
         "author": {
           "id": "2",
-          "name": "tester"
+          "name": "test"
         },
-        "timestamp": "2025-04-19T06:08:24.944Z"
+        "timestamp": "2025-04-22T23:40:09.525Z"
       }
     ],
-    "createdBy": "1",
+    "createdBy": "2",
     "subTasks": [],
     "attachments": [],
-    "createdAt": "2025-04-19T06:08:24.949Z",
-    "updatedAt": "2025-04-19T06:08:24.949Z",
+    "createdAt": "2025-04-22T23:40:09.527Z",
+    "updatedAt": "2025-04-22T23:40:09.527Z",
     "editHistory": []
   }
 ]

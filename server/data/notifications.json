@@ -1,1 +1,11 @@
-[]
+[
+  {
+    "id": "1",
+    "userId": "2",
+    "message": "You have been assigned to task: tasking",
+    "type": "task_assignment",
+    "relatedId": "1",
+    "read": false,
+    "createdAt": "2025-04-22T23:11:40.820Z"
+  }
+]

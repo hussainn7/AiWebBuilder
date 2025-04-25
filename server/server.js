@@ -108,6 +108,43 @@ ensureDataFilesExist();
 
 // Add user to all requests
 app.use((req, res, next) => {
+  // Check for Authorization header
+  const authHeader = req.headers.authorization;
+  
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    // In a real app, you would verify the JWT token
+    // For this mock app, we'll extract the user based on the email in the request
+    const users = readDataFile(usersFilePath);
+    
+    // If there's a user email in the request body, use that to find the user
+    if (req.body && req.body.email) {
+      const user = users.find(u => u.email.toLowerCase() === req.body.email.toLowerCase());
+      if (user) {
+        req.user = user;
+        return next();
+      }
+    }
+    
+    // If there's a userId in the request, use that
+    if (req.body && req.body.userId) {
+      const user = users.find(u => u.id === req.body.userId);
+      if (user) {
+        req.user = user;
+        return next();
+      }
+    }
+    
+    // Check if we have a user in the session (stored by login)
+    if (req.headers['x-user-email']) {
+      const user = users.find(u => u.email.toLowerCase() === req.headers['x-user-email'].toLowerCase());
+      if (user) {
+        req.user = user;
+        return next();
+      }
+    }
+  }
+  
+  // Default to the first user if no auth info is found
   const users = readDataFile(usersFilePath);
   req.user = users[0];
   next();
@@ -153,9 +190,17 @@ app.get('/api/tasks', (req, res) => {
 
 app.post('/api/tasks', (req, res) => {
   const tasks = readDataFile(tasksFilePath);
+  
+  // Ensure the creator is included in assigneeIds if not already present
+  let assigneeIds = req.body.assigneeIds || [];
+  if (!assigneeIds.includes(req.user.id)) {
+    assigneeIds.push(req.user.id);
+  }
+  
   const newTask = {
     id: (tasks.length + 1).toString(),
     ...req.body,
+    assigneeIds: assigneeIds, // Use the updated assigneeIds
     createdBy: req.user.id,
     subTasks: [],
     comments: [],
@@ -171,7 +216,7 @@ app.post('/api/tasks', (req, res) => {
 
 app.put('/api/tasks/:id', (req, res) => {
   const taskId = req.params.id;
-  const { clientId, projectId, ...otherUpdates } = req.body;
+  const { clientId, projectId, assigneeIds, title, description, status, dueDate, ...otherUpdates } = req.body;
   
   const tasks = readDataFile(tasksFilePath);
   const taskIndex = tasks.findIndex(task => task.id === taskId);
@@ -180,54 +225,79 @@ app.put('/api/tasks/:id', (req, res) => {
     return res.status(404).json({ message: 'Task not found' });
   }
   
+  const originalTask = { ...tasks[taskIndex] };
+  
   // Update the task
   tasks[taskIndex] = { 
     ...tasks[taskIndex], 
     ...otherUpdates,
-    clientId: clientId || tasks[taskIndex].clientId,
-    projectId: projectId || tasks[taskIndex].projectId,
+    clientId: clientId !== undefined ? clientId : tasks[taskIndex].clientId,
+    projectId: projectId !== undefined ? projectId : tasks[taskIndex].projectId,
+    assigneeIds: assigneeIds !== undefined ? assigneeIds : tasks[taskIndex].assigneeIds,
+    title: title !== undefined ? title : tasks[taskIndex].title,
+    description: description !== undefined ? description : tasks[taskIndex].description,
+    status: status !== undefined ? status : tasks[taskIndex].status,
+    dueDate: dueDate !== undefined ? dueDate : tasks[taskIndex].dueDate,
     updatedAt: new Date().toISOString() 
   };
   
-  // If client or project was updated, add to edit history
-  if (clientId || projectId) {
-    if (!tasks[taskIndex].editHistory) {
-      tasks[taskIndex].editHistory = [];
+  // Initialize edit history if it doesn't exist
+  if (!tasks[taskIndex].editHistory) {
+    tasks[taskIndex].editHistory = [];
+  }
+  
+  // Track all changes
+  const changes = [];
+  if (clientId !== undefined && clientId !== originalTask.clientId) changes.push('Client assignment');
+  if (projectId !== undefined && projectId !== originalTask.projectId) changes.push('Project assignment');
+  if (title !== undefined && title !== originalTask.title) changes.push('Title');
+  if (description !== undefined && description !== originalTask.description) changes.push('Description');
+  if (status !== undefined && status !== originalTask.status) changes.push('Status');
+  if (dueDate !== undefined && dueDate !== originalTask.dueDate) changes.push('Due date');
+  
+  // Check for assignee changes
+  if (assigneeIds !== undefined) {
+    const originalAssigneeIds = originalTask.assigneeIds || [];
+    const newAssigneeIds = assigneeIds || [];
+    
+    if (JSON.stringify(originalAssigneeIds.sort()) !== JSON.stringify(newAssigneeIds.sort())) {
+      changes.push('Assignees');
+      
+      // Create notifications for newly assigned users
+      const users = readDataFile(usersFilePath);
+      const notifications = readDataFile(notificationsFilePath);
+      
+      // Find newly added assignees
+      const newlyAssignedUserIds = newAssigneeIds.filter(id => !originalAssigneeIds.includes(id));
+      
+      // Create notifications for newly assigned users
+      if (newlyAssignedUserIds.length > 0) {
+        newlyAssignedUserIds.forEach(userId => {
+          if (userId !== req.user.id) { // Don't notify the user who made the change
+            notifications.push({
+              id: (notifications.length + 1).toString(),
+              userId: userId,
+              message: `You have been assigned to task: ${tasks[taskIndex].title}`,
+              type: 'task_assignment',
+              relatedId: taskId,
+              read: false,
+              createdAt: new Date().toISOString()
+            });
+          }
+        });
+        
+        writeDataFile(notificationsFilePath, notifications);
+      }
     }
-    
-    const changes = [];
-    if (clientId) changes.push('Client assignment');
-    if (projectId) changes.push('Project assignment');
-    
+  }
+  
+  // Only add to history if there were changes
+  if (changes.length > 0) {
     tasks[taskIndex].editHistory.push({
       userId: req.user.id,
       timestamp: new Date().toISOString(),
       changes: changes.join(', ')
     });
-    
-    // Add notifications to relevant users if task has assignees
-    if (tasks[taskIndex].assignees && tasks[taskIndex].assignees.length > 0) {
-      const clients = readDataFile(clientsFilePath);
-      const projects = readDataFile(projectsFilePath);
-      
-      const client = clientId ? clients.find(c => c.id === clientId) : null;
-      const project = projectId ? projects.find(p => p.id === projectId) : null;
-      
-      tasks[taskIndex].assignees.forEach(assignee => {
-        if (assignee.id !== req.user.id) { // Don't notify the user making the change
-          let message = 'Task has been updated';
-          if (client) message += ` and linked to client: ${client.name}`;
-          if (project) message += ` and project: ${project.name}`;
-          
-          addNotificationToUser(assignee.id, {
-            type: 'task_update',
-            title: 'Task Assignment Updated',
-            message,
-            taskId: taskId
-          });
-        }
-      });
-    }
   }
   
   writeDataFile(tasksFilePath, tasks);
@@ -235,14 +305,28 @@ app.put('/api/tasks/:id', (req, res) => {
 });
 
 app.delete('/api/tasks/:id', (req, res) => {
+  const taskId = req.params.id;
   const tasks = readDataFile(tasksFilePath);
-  const taskIndex = tasks.findIndex(task => task.id === req.params.id);
+  const taskIndex = tasks.findIndex(task => task.id === taskId);
+  
   if (taskIndex === -1) {
     return res.status(404).json({ message: 'Task not found' });
   }
-  tasks.splice(taskIndex, 1);
+  
+  // Check if user is admin or the creator of the task
+  const isAdmin = req.user.role === 'admin';
+  const isCreator = tasks[taskIndex].createdBy === req.user.id;
+  
+  if (!isAdmin && !isCreator) {
+    return res.status(403).json({ message: 'You do not have permission to delete this task' });
+  }
+  
+  // Remove the task
+  const removedTask = tasks.splice(taskIndex, 1)[0];
   writeDataFile(tasksFilePath, tasks);
-  res.json({ message: 'Task deleted successfully' });
+  
+  // Return success
+  res.json({ message: 'Task deleted successfully', task: removedTask });
 });
 
 // Enhanced tasks endpoint (tasks with related data)
@@ -250,11 +334,44 @@ app.get('/api/enhanced-tasks', (req, res) => {
   const tasks = readDataFile(tasksFilePath);
   const projects = readDataFile(projectsFilePath);
   const clients = readDataFile(clientsFilePath);
+  const users = readDataFile(usersFilePath);
+  
   const enhancedTasks = tasks.map(task => ({
     ...task,
     project: task.projectId ? projects.find(p => p.id === task.projectId) : undefined,
-    client: task.clientId ? clients.find(c => c.id === task.clientId) : undefined
+    client: task.clientId ? clients.find(c => c.id === task.clientId) : undefined,
+    assignees: task.assigneeIds ? task.assigneeIds.map(id => users.find(u => u.id === id)).filter(Boolean) : []
   }));
+  res.json(enhancedTasks);
+});
+
+// My tasks endpoint (only tasks assigned to the current user or created by them)
+app.get('/api/my-tasks', (req, res) => {
+  const tasks = readDataFile(tasksFilePath);
+  const projects = readDataFile(projectsFilePath);
+  const clients = readDataFile(clientsFilePath);
+  const users = readDataFile(usersFilePath);
+  
+  // Get the current user from the request
+  const currentUser = req.user;
+  
+  if (!currentUser) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  
+  // Filter tasks to only include those assigned to the current user or created by them
+  const myTasks = tasks.filter(task => 
+    (task.assigneeIds && task.assigneeIds.includes(currentUser.id)) || 
+    task.createdBy === currentUser.id
+  );
+  
+  const enhancedTasks = myTasks.map(task => ({
+    ...task,
+    project: task.projectId ? projects.find(p => p.id === task.projectId) : undefined,
+    client: task.clientId ? clients.find(c => c.id === task.clientId) : undefined,
+    assignees: task.assigneeIds ? task.assigneeIds.map(id => users.find(u => u.id === id)).filter(Boolean) : []
+  }));
+  
   res.json(enhancedTasks);
 });
 
@@ -303,6 +420,41 @@ app.post('/api/projects', (req, res) => {
   res.status(201).json(newProject);
 });
 
+app.delete('/api/projects/:id', (req, res) => {
+  const projectId = req.params.id;
+  const projects = readDataFile(projectsFilePath);
+  const projectIndex = projects.findIndex(project => project.id === projectId);
+  
+  if (projectIndex === -1) {
+    return res.status(404).json({ message: 'Project not found' });
+  }
+  
+  // Check if user is admin or the creator of the project
+  const isAdmin = req.user.role === 'admin';
+  const isCreator = projects[projectIndex].createdBy === req.user.id;
+  
+  if (!isAdmin && !isCreator) {
+    return res.status(403).json({ message: 'You do not have permission to delete this project' });
+  }
+  
+  // Remove the project
+  const removedProject = projects.splice(projectIndex, 1)[0];
+  writeDataFile(projectsFilePath, projects);
+  
+  // Update any tasks associated with this project (remove project reference)
+  const tasks = readDataFile(tasksFilePath);
+  const updatedTasks = tasks.map(task => {
+    if (task.projectId === projectId) {
+      return { ...task, projectId: null };
+    }
+    return task;
+  });
+  writeDataFile(tasksFilePath, updatedTasks);
+  
+  // Return success
+  res.json({ message: 'Project deleted successfully', project: removedProject });
+});
+
 // Clients endpoints
 app.get('/api/clients', (req, res) => {
   const clients = readDataFile(clientsFilePath);
@@ -330,6 +482,36 @@ app.get('/api/clients/:id', (req, res) => {
   }
   
   res.json(client);
+});
+
+app.delete('/api/clients/:id', (req, res) => {
+  const clientId = req.params.id;
+  const clients = readDataFile(clientsFilePath);
+  const clientIndex = clients.findIndex(client => client.id === clientId);
+  
+  if (clientIndex === -1) {
+    return res.status(404).json({ message: 'Client not found' });
+  }
+  
+  // Check if user is admin or the creator of the client
+  const isAdmin = req.user.role === 'admin';
+  const isCreator = clients[clientIndex].createdBy === req.user.id;
+  
+  if (!isAdmin && !isCreator) {
+    return res.status(403).json({ message: 'You do not have permission to delete this client' });
+  }
+  
+  // Remove the client
+  const removedClient = clients.splice(clientIndex, 1)[0];
+  writeDataFile(clientsFilePath, clients);
+  
+  // Also remove all tasks associated with this client
+  const tasks = readDataFile(tasksFilePath);
+  const updatedTasks = tasks.filter(task => task.clientId !== clientId);
+  writeDataFile(tasksFilePath, updatedTasks);
+  
+  // Return success
+  res.json({ message: 'Client deleted successfully', client: removedClient });
 });
 
 // Admin endpoints
@@ -502,9 +684,13 @@ app.post('/api/auth/login', (req, res) => {
   
   // Return the user (without password) and a token
   const { password: _, ...userWithoutPassword } = user;
+  
+  // In a real app, you would generate a JWT token with the user's ID
+  // For this mock app, we'll just include the user's email in the response
   res.json({
     user: userWithoutPassword,
-    token: 'mock-jwt-token'
+    token: `mock-jwt-token-${user.id}`, // Include user ID in token for identification
+    userEmail: user.email // Include email for client-side storage
   });
 });
 
@@ -543,7 +729,8 @@ app.post('/api/auth/register', (req, res) => {
   const { password: _, ...userWithoutPassword } = newUser;
   res.status(201).json({
     user: userWithoutPassword,
-    token: 'mock-jwt-token'
+    token: `mock-jwt-token-${newUser.id}`, // Include user ID in token for identification
+    userEmail: newUser.email // Include email for client-side storage
   });
 });
 
@@ -737,6 +924,20 @@ app.post('/api/upload', upload.single('file'), (req, res) => {
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // Start server
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-});
+const startServer = (port) => {
+  const server = app.listen(port)
+    .on('listening', () => {
+      console.log(`Server is running on port ${port}`);
+    })
+    .on('error', (err) => {
+      if (err.code === 'EADDRINUSE') {
+        console.log(`Port ${port} is busy, trying port ${port + 1}`);
+        startServer(port + 1);
+      } else {
+        console.error('Server error:', err);
+      }
+    });
+  return server;
+};
+
+startServer(PORT);

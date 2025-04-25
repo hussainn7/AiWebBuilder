@@ -1,9 +1,9 @@
 [
   {
     "id": "1",
-    "name": "Наш клиент",
+    "name": "test Client",
     "contactInfo": "syedh@gmail.com",
-    "description": "да\n",
+    "description": "test",
     "links": [],
     "status": "active"
   }

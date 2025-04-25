@@ -6,24 +6,23 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { toast } from "@/components/ui/sonner";
+import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format } from "date-fns";
 import { Calendar } from "@/components/ui/calendar";
-import { CalendarIcon, FileText, MessageSquare, History, Plus, Trash2, Upload } from "lucide-react";
+import { CalendarIcon, FileText, MessageSquare, History, Plus, Trash2, Upload, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { addTask } from "@/lib/api-utils";
+import { addTask, sendNotification } from "@/lib/api-utils";
 import { useQuery } from "@tanstack/react-query";
 import { getClients, getProjects, getUsers } from "@/lib/api-utils";
-import { Status, User } from "@/lib/types";
+import { Status, User, Task } from "@/lib/types";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuCheckboxItem } from "@/components/ui/dropdown-menu";
 import UserAvatar from "@/components/UserAvatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
-import axios from "axios";
 
 const statusOptions: { value: Status; label: string }[] = [
   { value: "draft", label: "Черновик" },
@@ -90,30 +89,43 @@ type TaskFormValues = z.infer<typeof taskSchema>;
 interface TaskFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onTaskCreated?: () => void;
 }
 
-export function TaskForm({ open, onOpenChange }: TaskFormProps) {
+export function TaskForm({ open, onOpenChange, onTaskCreated }: TaskFormProps) {
   const queryClient = useQueryClient();
-  const { token, user } = useAuth();
+  const { token, user, addNotification } = useAuth();
   
-  const { data: clients = [], isLoading: clientsLoading } = useQuery({
-    queryKey: ["clients"],
-    queryFn: () => getClients(token),
-    enabled: !!token
-  });
+  // Form state
+  const [activeTab, setActiveTab] = useState("details");
+  const [assigneeIds, setAssigneeIds] = useState<string[]>([]);
+  const [subtasks, setSubtasks] = useState<{ title: string; completed: boolean }[]>([]);
+  const [comments, setComments] = useState<{ text: string; author: { id: string; name: string }; timestamp: string }[]>([]);
+  const [changeHistory, setChangeHistory] = useState<{ text: string; author: { id: string; name: string }; timestamp: string }[]>([]);
+  const [fileAttachments, setFileAttachments] = useState<{ name: string; path: string }[]>([]);
+  const [newComment, setNewComment] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
-  const { data: projects = [], isLoading: projectsLoading } = useQuery({
-    queryKey: ["projects"],
-    queryFn: () => getProjects(token),
-    enabled: !!token
-  });
-  
-  const { data: users = [], isLoading: usersLoading } = useQuery({
+  // Fetch data
+  const { data: users = [] } = useQuery({
     queryKey: ["users"],
     queryFn: () => getUsers(token),
     enabled: !!token
   });
   
+  const { data: clients = [] } = useQuery({
+    queryKey: ["clients"],
+    queryFn: () => getClients(token),
+    enabled: !!token
+  });
+  
+  const { data: projects = [] } = useQuery({
+    queryKey: ["projects"],
+    queryFn: () => getProjects(token),
+    enabled: !!token
+  });
+
+  // Form definition
   const form = useForm<TaskFormValues>({
     resolver: zodResolver(taskSchema),
     defaultValues: {
@@ -123,93 +135,133 @@ export function TaskForm({ open, onOpenChange }: TaskFormProps) {
       dueDate: new Date(),
       clientId: "none",
       projectId: "none",
-      assigneeIds: [],
+      assigneeIds: user?.id ? [user.id] : [],
       subtasks: [],
       fileAttachments: [],
       comments: [],
-      changeHistory: [],
-    },
-  });
-
-  // Reset form when dialog closes
-  useEffect(() => {
-    if (!open) {
-      form.reset();
+      changeHistory: []
     }
-  }, [open, form]);
-
-  // Filter projects based on selected client
-  const selectedClientId = form.watch("clientId");
-  const filteredProjects = selectedClientId 
-    ? projects.filter(project => project.clientId === selectedClientId)
-    : projects;
-
-  // Add new subtask
+  });
+  
+  // Set current user as assignee when form opens
+  useEffect(() => {
+    if (open && user?.id) {
+      const currentAssignees = form.getValues("assigneeIds");
+      // Only add the current user if they're not already in the list
+      if (!currentAssignees.includes(user.id)) {
+        const newAssignees = [...currentAssignees, user.id];
+        form.setValue("assigneeIds", newAssignees);
+        setAssigneeIds(newAssignees);
+      }
+    }
+  }, [open, user, form]);
+  
+  // Watch for client ID changes to filter projects
+  const clientId = form.watch("clientId");
+  const filteredProjects = clientId && clientId !== "none"
+    ? projects.filter(project => project.clientId === clientId)
+    : [];
+  
+  // Reset project when client changes
+  useEffect(() => {
+    if (clientId === "none") {
+      form.setValue("projectId", "none");
+    }
+  }, [clientId, form]);
+  
+  // Handle assignee selection
+  const handleAssigneeChange = (userId: string, checked: boolean) => {
+    if (checked) {
+      form.setValue("assigneeIds", [userId]);
+      setAssigneeIds([userId]);
+    } else {
+      form.setValue("assigneeIds", []);
+      setAssigneeIds([]);
+    }
+  };
+  
+  // Handle subtask actions
   const addSubtask = () => {
-    const currentSubtasks = form.getValues("subtasks") || [];
-    form.setValue("subtasks", [...currentSubtasks, { title: "", completed: false }]);
+    const currentSubtasks = form.getValues("subtasks");
+    const newSubtasks = [...currentSubtasks, { title: "", completed: false }];
+    form.setValue("subtasks", newSubtasks);
+    setSubtasks(newSubtasks as { title: string; completed: boolean }[]);
   };
-
-  // Remove subtask
+  
   const removeSubtask = (index: number) => {
-    const currentSubtasks = form.getValues("subtasks") || [];
-    form.setValue("subtasks", currentSubtasks.filter((_, i) => i !== index));
+    const currentSubtasks = form.getValues("subtasks");
+    const newSubtasks = currentSubtasks.filter((_, i) => i !== index);
+    form.setValue("subtasks", newSubtasks);
+    setSubtasks(newSubtasks as { title: string; completed: boolean }[]);
   };
-
-  // Add new comment
+  
+  const updateSubtaskTitle = (index: number, title: string) => {
+    const currentSubtasks = form.getValues("subtasks");
+    const newSubtasks = currentSubtasks.map((subtask, i) => 
+      i === index ? { ...subtask, title } : subtask
+    );
+    form.setValue("subtasks", newSubtasks);
+    setSubtasks(newSubtasks as { title: string; completed: boolean }[]);
+  };
+  
+  const toggleSubtaskCompletion = (index: number) => {
+    const currentSubtasks = form.getValues("subtasks");
+    const newSubtasks = currentSubtasks.map((subtask, i) => 
+      i === index ? { ...subtask, completed: !subtask.completed } : subtask
+    );
+    form.setValue("subtasks", newSubtasks);
+    setSubtasks(newSubtasks as { title: string; completed: boolean }[]);
+  };
+  
+  // Handle file attachments
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+    
+    // In a real app, you would upload files to a server here
+    // For now, we'll just simulate it
+    const newAttachments = Array.from(files).map(file => ({
+      name: file.name,
+      path: URL.createObjectURL(file)
+    }));
+    
+    const currentAttachments = form.getValues("fileAttachments");
+    const updatedAttachments = [...currentAttachments, ...newAttachments];
+    
+    form.setValue("fileAttachments", updatedAttachments);
+    setFileAttachments(updatedAttachments as { name: string; path: string }[]);
+  };
+  
+  const removeAttachment = (index: number) => {
+    const currentAttachments = form.getValues("fileAttachments");
+    const newAttachments = currentAttachments.filter((_, i) => i !== index);
+    form.setValue("fileAttachments", newAttachments);
+    setFileAttachments(newAttachments as { name: string; path: string }[]);
+  };
+  
+  // Handle comments
   const addComment = () => {
-    const currentComments = form.getValues("comments") || [];
+    if (!newComment.trim()) return;
+    
     const timestamp = new Date().toISOString();
-    form.setValue("comments", [...currentComments, { 
-      text: "", 
-      author: { 
-        id: user?.id?.toString() || "unknown", 
-        name: user?.email?.split("@")[0] || "Пользователь" 
+    const comment = {
+      text: newComment,
+      author: {
+        id: user?.id?.toString() || "unknown",
+        name: user?.email?.split("@")[0] || "Пользователь"
       },
       timestamp
-    }]);
+    };
+    
+    const currentComments = form.getValues("comments");
+    const newComments = [...currentComments, comment];
+    
+    form.setValue("comments", newComments);
+    setComments(newComments as { text: string; author: { id: string; name: string }; timestamp: string }[]);
+    setNewComment("");
   };
-
-  // Remove comment
-  const removeComment = (index: number) => {
-    const currentComments = form.getValues("comments") || [];
-    form.setValue("comments", currentComments.filter((_, i) => i !== index));
-  };
-
-  // Upload file
-  const fileInputRef = useRef<HTMLInputElement>(null);
   
-  const handleFileButtonClick = () => {
-    fileInputRef.current?.click();
-  };
-
-  const uploadFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    const formData = new FormData();
-    formData.append("file", file);
-
-    try {
-      // Just store the file name locally without actually uploading
-      const currentFileAttachments = form.getValues("fileAttachments") || [];
-      form.setValue("fileAttachments", [...currentFileAttachments, { 
-        name: file.name, 
-        path: `/uploads/${file.name}` // This is just a mock path
-      }]);
-      toast.success("Файл успешно добавлен");
-    } catch (error) {
-      console.error("Error adding file:", error);
-      toast.error("Ошибка при добавлении файла");
-    }
-  };
-
-  // Remove change history watch to prevent too many entries
-  useEffect(() => {
-    // We'll only add change history on submit instead of on every change
-    return () => {};
-  }, [form, user]);
-
+  // Form submission
   async function onSubmit(values: TaskFormValues) {
     try {
       // Make sure all subtasks have required fields
@@ -230,7 +282,8 @@ export function TaskForm({ open, onOpenChange }: TaskFormProps) {
         timestamp
       }];
       
-      await addTask({
+      // Prepare properly typed data for the API
+      const taskData = {
         title: values.title,
         description: values.description,
         status: values.status,
@@ -239,15 +292,99 @@ export function TaskForm({ open, onOpenChange }: TaskFormProps) {
         projectId: values.projectId === "none" ? undefined : values.projectId,
         assigneeIds: values.assigneeIds,
         subtasks: validatedSubtasks,
-        fileAttachments: values.fileAttachments,
-        comments: values.comments,
-        changeHistory: newChangeHistory,
-      });
+        fileAttachments: values.fileAttachments ? values.fileAttachments.map(f => ({
+          name: f.name || "",
+          path: f.path || ""
+        })) : undefined,
+        comments: values.comments ? values.comments.map(c => ({
+          text: c.text || "",
+          author: {
+            id: c.author?.id || "",
+            name: c.author?.name || ""
+          },
+          timestamp: c.timestamp || timestamp
+        })) : undefined,
+        changeHistory: newChangeHistory.map(h => ({
+          text: h.text || "",
+          author: {
+            id: h.author?.id || "",
+            name: h.author?.name || ""
+          },
+          timestamp: h.timestamp || timestamp
+        })),
+        createdBy: user?.id || "",
+      };
       
+      const newTask = await addTask(taskData, token);
+      
+      // Send notifications to assigned users
+      if (values.assigneeIds && values.assigneeIds.length > 0) {
+        // Get client and project names for the notification
+        const clientName = values.clientId && values.clientId !== "none" 
+          ? clients.find(c => c.id === values.clientId)?.name || "Неизвестный клиент"
+          : "Без клиента";
+          
+        const projectName = values.projectId && values.projectId !== "none"
+          ? projects.find(p => p.id === values.projectId)?.name || "Неизвестный проект"
+          : "Без проекта";
+        
+        // Notify each assigned user
+        values.assigneeIds.forEach(userId => {
+          // Don't notify the creator
+          if (userId !== user?.id) {
+            // Find user info for personalized notification
+            const assignedUser = users.find(u => u.id === userId);
+            if (assignedUser) {
+              // Add notification to current user's context
+              addNotification({
+                type: "task_assignment",
+                title: "Новое назначение задачи",
+                message: `Вы были назначены на задачу "${values.title}" ${projectName !== "Без проекта" ? `для проекта "${projectName}"` : ''} ${clientName !== "Без клиента" ? `(клиент: ${clientName})` : ''}. Статус задачи: ${values.status}.`,
+                entityId: newTask.id,
+                entityType: "task",
+                taskId: newTask.id
+              });
+              
+              // Also send notification to the server for the assigned user
+              // This ensures the notification persists and is visible when the assigned user logs in
+              try {
+                sendNotification(
+                  userId, 
+                  {
+                    type: "task_assignment",
+                    title: "Новое назначение задачи",
+                    message: `Вы были назначены на задачу "${values.title}" ${projectName !== "Без проекта" ? `для проекта "${projectName}"` : ''} ${clientName !== "Без клиента" ? `(клиент: ${clientName})` : ''}. Статус задачи: ${values.status}.`,
+                    entityId: newTask.id,
+                    entityType: "task",
+                    taskId: newTask.id
+                  },
+                  token
+                );
+              } catch (error) {
+                console.error("Error sending notification to user:", error);
+              }
+            }
+          }
+        });
+      }
+      
+      // Show success message
       toast.success("Задача успешно добавлена");
+      
+      // Update cache with the new task to make it appear immediately
+      const currentTasks = queryClient.getQueryData<Task[]>(["enhanced-tasks"]) || [];
+      queryClient.setQueryData(["enhanced-tasks"], [...currentTasks, newTask]);
+      
+      // Invalidate queries to refresh data
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
       queryClient.invalidateQueries({ queryKey: ["tasks-by-status"] });
       queryClient.invalidateQueries({ queryKey: ["enhanced-tasks"] });
+      
+      // Call onTaskCreated callback if provided
+      if (onTaskCreated) {
+        onTaskCreated();
+      }
+      
       form.reset();
       onOpenChange(false);
     } catch (error) {
@@ -256,348 +393,340 @@ export function TaskForm({ open, onOpenChange }: TaskFormProps) {
     }
   }
 
-  // Get selected assignees
-  const selectedAssigneeIds = form.watch("assigneeIds");
-  const selectedAssignees = users.filter(user => 
-    selectedAssigneeIds.includes(user.id)
-  );
-
-  // Loading and empty states for users dropdown
-  const hasUsers = users.length > 0;
-  const userContent = () => {
-    if (usersLoading) {
-      return (
-        <div className="p-4 text-center text-sm text-muted-foreground">
-          Загрузка пользователей...
-        </div>
-      );
-    }
-    
-    if (!hasUsers) {
-      return (
-        <div className="p-4 text-center text-sm text-muted-foreground">
-          Нет доступных пользователей
-        </div>
-      );
-    }
-    
-    return users.map((user) => (
-      <DropdownMenuCheckboxItem
-        key={user.id}
-        checked={selectedAssigneeIds.includes(user.id)}
-        onCheckedChange={(checked) => {
-          const updatedIds = checked
-            ? [...selectedAssigneeIds, user.id]
-            : selectedAssigneeIds.filter(id => id !== user.id);
-          form.setValue("assigneeIds", updatedIds);
-        }}
-        className="flex items-center gap-2"
-      >
-        <UserAvatar user={user} size="sm" />
-        {user.name}
-      </DropdownMenuCheckboxItem>
-    ));
-  };
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Добавить задачу</DialogTitle>
-          <DialogDescription>Введите необходимую информацию о задаче</DialogDescription>
+          <DialogTitle>Создать новую задачу</DialogTitle>
+          <DialogDescription>
+            Заполните форму ниже, чтобы создать новую задачу
+          </DialogDescription>
         </DialogHeader>
         
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="title"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Название задачи</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Название задачи" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            
-            <FormField
-              control={form.control}
-              name="description"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Описание задачи</FormLabel>
-                  <FormControl>
-                    <Textarea placeholder="Описание задачи" {...field} className="min-h-[100px]" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="status"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Статус задачи</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Выберите статус" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {statusOptions.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+              <TabsList className="grid grid-cols-3 mb-4">
+                <TabsTrigger value="details">Детали</TabsTrigger>
+                <TabsTrigger value="subtasks">Подзадачи</TabsTrigger>
+                <TabsTrigger value="attachments">Вложения</TabsTrigger>
+              </TabsList>
               
-              <FormField
-                control={form.control}
-                name="dueDate"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Срок выполнения задачи</FormLabel>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <FormControl>
-                          <Button
-                            variant={"outline"}
-                            className={cn(
-                              "w-full pl-3 text-left font-normal",
-                              !field.value && "text-muted-foreground"
-                            )}
-                          >
-                            {field.value ? (
-                              format(field.value, "dd.MM.yyyy")
-                            ) : (
-                              <span>Выберите дату</span>
-                            )}
-                            <CalendarIcon className="ml-auto h-4 w-4" />
-                          </Button>
-                        </FormControl>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={field.value}
-                          onSelect={field.onChange}
-                          initialFocus
+              <TabsContent value="details" className="space-y-4">
+                {/* Title */}
+                <FormField
+                  control={form.control}
+                  name="title"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Название задачи</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Введите название задачи" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                {/* Description */}
+                <FormField
+                  control={form.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Описание</FormLabel>
+                      <FormControl>
+                        <Textarea 
+                          placeholder="Введите описание задачи" 
+                          className="min-h-[100px]" 
+                          {...field} 
                         />
-                      </PopoverContent>
-                    </Popover>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="clientId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Клиент</FormLabel>
-                    <Select 
-                      onValueChange={(value) => {
-                        field.onChange(value);
-                        form.setValue("projectId", "none"); // Reset project when client changes
-                      }} 
-                      value={field.value || "none"}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Выберите клиента" />
-                        </SelectTrigger>
                       </FormControl>
-                      <SelectContent>
-                        <SelectItem value="none">Не выбран</SelectItem>
-                        {clients.map((client) => (
-                          <SelectItem key={client.id} value={client.id}>
-                            {client.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={form.control}
-                name="projectId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Проект</FormLabel>
-                    <Select 
-                      onValueChange={field.onChange} 
-                      value={field.value || "none"}
-                      disabled={!selectedClientId || selectedClientId === "none"}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder={selectedClientId && selectedClientId !== "none" ? "Выберите проект" : "Сначала выберите клиента"} />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="none">Не выбран</SelectItem>
-                        {filteredProjects.map((project) => (
-                          <SelectItem key={project.id} value={project.id}>
-                            {project.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-            
-            <FormField
-              control={form.control}
-              name="assigneeIds"
-              render={({ field }) => (
-                <FormItem>
-                  <div className="flex justify-between items-center">
-                    <FormLabel>Исполнители</FormLabel>
-                    {selectedAssignees.length > 0 && (
-                      <div className="flex -space-x-2">
-                        {selectedAssignees.slice(0, 3).map((user) => (
-                          <UserAvatar key={user.id} user={user} size="sm" />
-                        ))}
-                        {selectedAssignees.length > 3 && (
-                          <div className="flex items-center justify-center w-8 h-8 rounded-full bg-muted text-xs text-muted-foreground">
-                            +{selectedAssignees.length - 3}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                  <FormControl>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="outline" className="w-full justify-between">
-                          Выбрать исполнителей
-                          <span className="ml-2 text-xs bg-primary text-primary-foreground rounded-full px-2 py-0.5">
-                            {selectedAssigneeIds.length}
-                          </span>
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent className="w-56 max-h-[300px] overflow-auto">
-                        {userContent()}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            
-            <div>
-              <div className="flex justify-between items-center mb-2">
-                <h3 className="text-sm font-medium">Подзадачи</h3>
-                <Button type="button" size="sm" variant="outline" onClick={addSubtask}>
-                  <Plus className="h-4 w-4 mr-1" /> Добавить подзадачу
-                </Button>
-              </div>
-              
-              {form.watch("subtasks").map((_, index) => (
-                <div key={index} className="flex items-center gap-2 mb-2">
-                  <FormField
-                    control={form.control}
-                    name={`subtasks.${index}.title`}
-                    render={({ field }) => (
-                      <FormItem className="flex-1">
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                {/* Status */}
+                <FormField
+                  control={form.control}
+                  name="status"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Статус</FormLabel>
+                      <Select 
+                        onValueChange={field.onChange} 
+                        defaultValue={field.value}
+                      >
                         <FormControl>
-                          <Input placeholder="Название подзадачи" {...field} />
+                          <SelectTrigger>
+                            <SelectValue placeholder="Выберите статус" />
+                          </SelectTrigger>
                         </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <Button type="button" size="icon" variant="outline" onClick={() => removeSubtask(index)}>
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
-            </div>
-            
-            <div>
-              <div className="flex justify-between items-center mb-2">
-                <h3 className="text-sm font-medium">Файловые вложения</h3>
-                <Button type="button" size="sm" variant="outline" onClick={handleFileButtonClick}>
-                  <Upload className="h-4 w-4 mr-1" /> Загрузить файл
-                  <input type="file" ref={fileInputRef} onChange={uploadFile} hidden />
+                        <SelectContent>
+                          {statusOptions.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                {/* Due Date */}
+                <FormField
+                  control={form.control}
+                  name="dueDate"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col">
+                      <FormLabel>Срок выполнения</FormLabel>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant="outline"
+                              className={cn(
+                                "w-full pl-3 text-left font-normal",
+                                !field.value && "text-muted-foreground"
+                              )}
+                            >
+                              {field.value ? (
+                                format(field.value, "dd.MM.yyyy")
+                              ) : (
+                                <span>Выберите дату</span>
+                              )}
+                              <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={field.value}
+                            onSelect={field.onChange}
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                {/* Client */}
+                <FormField
+                  control={form.control}
+                  name="clientId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Клиент</FormLabel>
+                      <Select 
+                        onValueChange={field.onChange} 
+                        defaultValue={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Выберите клиента" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="none">Нет</SelectItem>
+                          {clients.map((client) => (
+                            <SelectItem key={client.id} value={client.id}>
+                              {client.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                {/* Project */}
+                <FormField
+                  control={form.control}
+                  name="projectId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Проект</FormLabel>
+                      <Select 
+                        onValueChange={field.onChange} 
+                        defaultValue={field.value}
+                        disabled={clientId === "none"}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder={clientId === "none" ? "Сначала выберите клиента" : "Выберите проект"} />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="none">Нет</SelectItem>
+                          {filteredProjects.map((project) => (
+                            <SelectItem key={project.id} value={project.id}>
+                              {project.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                {/* Assignees */}
+                <FormField
+                  control={form.control}
+                  name="assigneeIds"
+                  render={() => (
+                    <FormItem>
+                      <FormLabel>Исполнители</FormLabel>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="outline" className="w-full justify-between">
+                            <span>
+                              {assigneeIds.length 
+                                ? `Выбран исполнитель: ${users.find(u => u.id === assigneeIds[0])?.name || 'Пользователь'}` 
+                                : "Выберите исполнителя"}
+                            </span>
+                            <CalendarIcon className="ml-2 h-4 w-4 opacity-50" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent className="w-56">
+                          {users.map((user) => (
+                            <DropdownMenuCheckboxItem
+                              key={user.id}
+                              checked={assigneeIds.includes(user.id)}
+                              onCheckedChange={(checked) => {
+                                handleAssigneeChange(user.id, !!checked);
+                              }}
+                            >
+                              <div className="flex items-center">
+                                <UserAvatar user={user} size="sm" />
+                                <span className="ml-2">{user.name || user.email}</span>
+                              </div>
+                            </DropdownMenuCheckboxItem>
+                          ))}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                      {assigneeIds.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {assigneeIds.map(id => {
+                            const selectedUser = users.find(u => u.id === id);
+                            return selectedUser ? (
+                              <div key={id} className="flex items-center bg-muted p-2 rounded-md">
+                                <UserAvatar user={selectedUser} size="sm" />
+                                <span className="ml-2">{selectedUser.name || selectedUser.email}</span>
+                              </div>
+                            ) : null;
+                          })}
+                        </div>
+                      )}
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </TabsContent>
+              
+              <TabsContent value="subtasks" className="space-y-4">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={addSubtask}
+                  className="mb-4"
+                >
+                  <Plus className="mr-2 h-4 w-4" /> Добавить подзадачу
                 </Button>
-              </div>
+                
+                {subtasks.map((subtask, index) => (
+                  <div key={index} className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => toggleSubtaskCompletion(index)}
+                    >
+                      {subtask.completed ? (
+                        <Check className="h-4 w-4" />
+                      ) : (
+                        <div className="h-4 w-4 border rounded-sm" />
+                      )}
+                    </Button>
+                    <Input
+                      value={subtask.title}
+                      onChange={(e) => updateSubtaskTitle(index, e.target.value)}
+                      placeholder="Название подзадачи"
+                      className="flex-1"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => removeSubtask(index)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+                
+                {subtasks.length === 0 && (
+                  <div className="text-center text-muted-foreground p-4">
+                    Нет подзадач. Нажмите кнопку выше, чтобы добавить.
+                  </div>
+                )}
+              </TabsContent>
               
-              {form.watch("fileAttachments").map((file, index) => (
-                <div key={index} className="flex items-center gap-2 mb-2">
-                  <span className="text-sm">{file.name}</span>
-                  <Button type="button" size="icon" variant="outline">
-                    <Trash2 className="h-4 w-4" />
+              <TabsContent value="attachments" className="space-y-4">
+                <div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="mb-4"
+                  >
+                    <Upload className="mr-2 h-4 w-4" /> Загрузить файлы
                   </Button>
-                </div>
-              ))}
-            </div>
-            
-            <div>
-              <div className="flex justify-between items-center mb-2">
-                <h3 className="text-sm font-medium">Комментарии</h3>
-                <Button type="button" size="sm" variant="outline" onClick={addComment}>
-                  <MessageSquare className="h-4 w-4 mr-1" /> Добавить комментарий
-                </Button>
-              </div>
-              
-              {form.watch("comments").map((comment, index) => (
-                <div key={index} className="flex items-center gap-2 mb-2">
-                  <Textarea value={comment.text} readOnly />
-                  <Button type="button" size="icon" variant="outline" onClick={() => removeComment(index)}>
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                  <Textarea 
-                    value={comment.text} 
-                    onChange={(e) => {
-                      const currentComments = form.getValues("comments") || [];
-                      currentComments[index].text = e.target.value;
-                      form.setValue("comments", currentComments);
-                    }} 
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileUpload}
+                    className="hidden"
+                    multiple
                   />
                 </div>
-              ))}
-            </div>
-            
-            <div>
-              <div className="flex justify-between items-center mb-2">
-                <h3 className="text-sm font-medium">История изменений</h3>
-              </div>
-              
-              {form.watch("changeHistory").map((record, index) => (
-                <div key={index} className="flex items-center gap-2 mb-2">
-                  <Textarea value={record.text} readOnly />
-                </div>
-              ))}
-            </div>
+                
+                {fileAttachments.length > 0 ? (
+                  <div className="space-y-2">
+                    {fileAttachments.map((file, index) => (
+                      <div key={index} className="flex items-center justify-between p-2 border rounded-md">
+                        <div className="flex items-center">
+                          <FileText className="mr-2 h-4 w-4" />
+                          <span>{file.name}</span>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => removeAttachment(index)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center text-muted-foreground p-4">
+                    Нет вложений. Нажмите кнопку выше, чтобы добавить.
+                  </div>
+                )}
+              </TabsContent>
+            </Tabs>
             
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-                Отмена
-              </Button>
-              <Button type="submit">Добавить</Button>
+              <Button type="submit">Создать задачу</Button>
             </DialogFooter>
           </form>
         </Form>

@@ -6,6 +6,7 @@ import { Input } from '../components/ui/input';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../components/ui/card';
 import { Label } from '../components/ui/label';
 import { toast } from 'sonner';
+import { Checkbox } from '@/components/ui/checkbox';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -14,6 +15,7 @@ const Login = () => {
     email: '',
     password: '',
   });
+  const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -22,7 +24,7 @@ const Login = () => {
 
     try {
       // Use the real login endpoint
-      const response = await fetch('http://localhost:5000/api/auth/login', {
+      const response = await fetch('http://localhost:5001/api/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -38,7 +40,8 @@ const Login = () => {
         throw new Error(data.message || 'Login failed');
       }
 
-      login(data.user, data.token);
+      // Pass the rememberMe state to the login function
+      login(data.user, data.token, data.userEmail, rememberMe);
       toast.success('Welcome back!');
       navigate('/dashboard');
     } catch (error) {
@@ -78,6 +81,19 @@ const Login = () => {
                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                 required
               />
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox 
+                id="rememberMe" 
+                checked={rememberMe} 
+                onCheckedChange={(checked) => setRememberMe(checked === true)}
+              />
+              <Label 
+                htmlFor="rememberMe" 
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+              >
+                Remember me
+              </Label>
             </div>
           </CardContent>
           <CardFooter className="flex flex-col space-y-4">

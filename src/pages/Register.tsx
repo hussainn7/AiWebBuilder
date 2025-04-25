@@ -26,7 +26,7 @@ const Register = () => {
 
     try {
       // Use the real registration endpoint
-      const response = await fetch('http://localhost:5000/api/auth/register', {
+      const response = await fetch('http://localhost:5001/api/auth/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -42,7 +42,7 @@ const Register = () => {
       // Invalidate the admin-users query to refresh the user list in the Admin panel
       queryClient.invalidateQueries({ queryKey: ['admin-users'] });
 
-      login(data.user, data.token);
+      login(data.user, data.token, data.userEmail);
       toast.success('Welcome to Task Pulse!');
       navigate('/dashboard');
     } catch (error) {

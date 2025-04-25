@@ -1,11 +1,15 @@
 [
   {
     "id": "1",
-    "name": "Наш проект",
-    "description": "test",
+    "name": "test",
+    "description": "testt",
     "clientId": "1",
-    "status": "completed",
-    "startDate": "2025-04-19T04:26:28.829Z",
-    "endDate": "2025-04-30T04:00:00.000Z"
+    "status": "active",
+    "startDate": "2025-04-22T23:38:06.090Z",
+    "endDate": "2025-06-24T04:00:00.000Z",
+    "createdBy": "1",
+    "assignedUserIds": [
+      "2"
+    ]
   }
 ]

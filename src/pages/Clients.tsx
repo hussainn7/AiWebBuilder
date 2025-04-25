@@ -4,35 +4,51 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ExternalLink, Plus, Search, Calendar, FileText, Clock, Link2 } from "lucide-react";
+import { CustomBadge } from "@/components/ui/custom-badge";
+import { ExternalLink, Plus, Search, Calendar, FileText, Clock, Link2, Trash2 } from "lucide-react";
 import { ClientForm } from "@/components/ClientForm";
-import { useQuery } from "@tanstack/react-query";
-import { getClients, getEnhancedTasks, getProjects } from "@/lib/api-utils";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { getClients, getEnhancedTasks, getProjects, deleteClient } from "@/lib/api-utils";
 import { Client, Task, Project } from "@/lib/types";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { format } from "date-fns";
 import { ru } from "date-fns/locale";
+import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
+import { 
+  AlertDialog, 
+  AlertDialogAction, 
+  AlertDialogCancel, 
+  AlertDialogContent, 
+  AlertDialogDescription, 
+  AlertDialogHeader, 
+  AlertDialogTitle 
+} from "@/components/ui/alert-dialog";
 
 const Clients = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [clientDetailsOpen, setClientDetailsOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
   
-  const { data: clients = [] } = useQuery({
+  const { user, token } = useAuth();
+  const queryClient = useQueryClient();
+  
+  const { data: clients = [], refetch: refetchClients } = useQuery({
     queryKey: ["clients"],
-    queryFn: getClients
+    queryFn: () => getClients(token || '')
   });
   
   const { data: allTasks = [] } = useQuery({
     queryKey: ["enhanced-tasks"],
-    queryFn: getEnhancedTasks
+    queryFn: () => getEnhancedTasks(token || '')
   });
 
   const { data: projects = [] } = useQuery({
     queryKey: ["projects"],
-    queryFn: getProjects
+    queryFn: () => getProjects(token || '')
   });
   
   // Filter clients based on search query
@@ -51,13 +67,50 @@ const Clients = () => {
   const getClientProjectsCount = (clientId: string) => {
     return (projects as Project[]).filter(project => project.clientId === clientId).length;
   };
-
-  // Open client details dialog
-  const openClientDetails = (client: Client) => {
-    setSelectedClient(client);
-    setClientDetailsOpen(true);
+  
+  // Handle client deletion
+  const handleDeleteClient = async () => {
+    if (!clientToDelete) return;
+    
+    try {
+      await deleteClient(clientToDelete.id, token || '');
+      
+      // Show success message
+      toast.success('Клиент успешно удален');
+      
+      // Close the delete dialog
+      setDeleteDialogOpen(false);
+      setClientToDelete(null);
+      
+      // If client details dialog is open and we're deleting the selected client, close it
+      if (selectedClient && selectedClient.id === clientToDelete.id) {
+        setClientDetailsOpen(false);
+        setSelectedClient(null);
+      }
+      
+      // Refresh data
+      refetchClients();
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
+      queryClient.invalidateQueries({ queryKey: ["enhanced-tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["calendar-events"] });
+    } catch (error) {
+      console.error('Error deleting client:', error);
+      toast.error('Не удалось удалить клиента');
+    }
   };
   
+  // Check if user can delete a client
+  const canDeleteClient = (client: Client) => {
+    return user?.role === 'admin' || client.createdBy === user?.id;
+  };
+  
+  // Open delete confirmation dialog
+  const openDeleteDialog = (client: Client, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent opening client details
+    setClientToDelete(client);
+    setDeleteDialogOpen(true);
+  };
+
   return (
     <MainLayout title="Клиенты">
       <div className="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -83,7 +136,11 @@ const Clients = () => {
             client={client} 
             tasksCount={getClientTasksCount(client.id)}
             projectsCount={getClientProjectsCount(client.id)}
-            onClick={() => openClientDetails(client)}
+            onClick={() => {
+              setSelectedClient(client);
+              setClientDetailsOpen(true);
+            }}
+            onDelete={canDeleteClient(client) ? (e) => openDeleteDialog(client, e) : undefined}
           />
         ))}
         
@@ -102,10 +159,31 @@ const Clients = () => {
           client={selectedClient} 
           open={clientDetailsOpen} 
           onOpenChange={setClientDetailsOpen}
-          tasks={allTasks as Task[]}
-          projects={projects as Project[]}
+          tasks={(allTasks as Task[]).filter(task => task.clientId === selectedClient.id)}
+          projects={(projects as Project[]).filter(project => project.clientId === selectedClient.id)}
+          onDelete={canDeleteClient(selectedClient) ? () => {
+            setClientToDelete(selectedClient);
+            setDeleteDialogOpen(true);
+          } : undefined}
         />
       )}
+      
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Удалить клиента?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Это действие нельзя отменить. Клиент будет удален вместе со всеми связанными задачами.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex justify-end space-x-2 pt-4">
+            <AlertDialogCancel>Отмена</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteClient} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Удалить
+            </AlertDialogAction>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
     </MainLayout>
   );
 };
@@ -115,19 +193,26 @@ interface ClientCardProps {
   tasksCount: number;
   projectsCount: number;
   onClick: () => void;
+  onDelete?: (e: React.MouseEvent) => void;
 }
 
-const ClientCard = ({ client, tasksCount, projectsCount, onClick }: ClientCardProps) => {
+const ClientCard = ({ client, tasksCount, projectsCount, onClick, onDelete }: ClientCardProps) => {
   return (
-    <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={onClick}>
-      <CardHeader>
-        <CardTitle className="flex justify-between items-center">
-          {client.name}
-          <Badge variant={client.status === 'active' ? 'default' : 'secondary'}>
-            {client.status === 'active' ? 'Активный' : 'Неактивный'}
-          </Badge>
-        </CardTitle>
-        <CardDescription>{client.contactInfo}</CardDescription>
+    <Card className="cursor-pointer hover:border-primary/50 transition-colors relative" onClick={onClick}>
+      {onDelete && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="absolute top-2 right-2 h-6 w-6 text-muted-foreground hover:text-destructive hover:bg-destructive/10 z-10"
+          onClick={onDelete}
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
+      )}
+      
+      <CardHeader className="p-4 pb-2">
+        <CardTitle className="text-lg pr-6">{client.name}</CardTitle>
+        <CardDescription className="line-clamp-2">{client.description}</CardDescription>
       </CardHeader>
       
       <CardContent>
@@ -175,9 +260,10 @@ interface ClientDetailsDialogProps {
   onOpenChange: (open: boolean) => void;
   tasks: Task[];
   projects: Project[];
+  onDelete?: () => void;
 }
 
-const ClientDetailsDialog = ({ client, open, onOpenChange, tasks, projects }: ClientDetailsDialogProps) => {
+const ClientDetailsDialog = ({ client, open, onOpenChange, tasks, projects, onDelete }: ClientDetailsDialogProps) => {
   const [activeTab, setActiveTab] = useState("overview");
 
   // Filter tasks for this client
@@ -205,234 +291,196 @@ const ClientDetailsDialog = ({ client, open, onOpenChange, tasks, projects }: Cl
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[800px] max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex justify-between items-center">
-            {client.name}
-            <Badge variant={client.status === 'active' ? 'default' : 'secondary'}>
-              {client.status === 'active' ? 'Активный' : 'Неактивный'}
-            </Badge>
-          </DialogTitle>
+          <div className="flex justify-between items-start">
+            <DialogTitle className="text-xl">{client.name}</DialogTitle>
+            {onDelete && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                onClick={onDelete}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
         </DialogHeader>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-4">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="overview">Обзор</TabsTrigger>
-            <TabsTrigger value="tasks">Задачи</TabsTrigger>
-            <TabsTrigger value="history">История</TabsTrigger>
-          </TabsList>
-
-          {/* Overview Tab */}
-          <TabsContent value="overview" className="space-y-4">
+        <div className="mt-6">
+          <div className="flex border-b mb-6">
+            <button
+              className={`px-4 py-2 font-medium text-sm ${activeTab === "overview" ? "border-b-2 border-primary text-primary" : "text-muted-foreground"}`}
+              onClick={() => setActiveTab("overview")}
+            >
+              Обзор
+            </button>
+            <button
+              className={`px-4 py-2 font-medium text-sm ${activeTab === "projects" ? "border-b-2 border-primary text-primary" : "text-muted-foreground"}`}
+              onClick={() => setActiveTab("projects")}
+            >
+              Проекты ({projects.length})
+            </button>
+            <button
+              className={`px-4 py-2 font-medium text-sm ${activeTab === "tasks" ? "border-b-2 border-primary text-primary" : "text-muted-foreground"}`}
+              onClick={() => setActiveTab("tasks")}
+            >
+              Задачи ({tasks.length})
+            </button>
+          </div>
+          
+          {activeTab === "overview" && (
             <div className="space-y-4">
-              <div>
-                <h3 className="text-sm font-medium">Контактная информация:</h3>
-                <p className="text-sm">{client.contactInfo}</p>
-              </div>
-
-              <div>
-                <h3 className="text-sm font-medium">Описание:</h3>
-                <p className="text-sm">{client.description}</p>
-              </div>
-
-              {client.links && client.links.length > 0 && (
+              <div className="space-y-4">
                 <div>
-                  <h3 className="text-sm font-medium">Ссылки:</h3>
-                  <div className="space-y-1 mt-2">
-                    {client.links.map((link, index) => (
-                      <a 
-                        key={index} 
-                        href={link.startsWith('http') ? link : `https://${link}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-sm text-blue-500 hover:underline flex items-center gap-1"
-                      >
-                        <ExternalLink className="h-3 w-3" />
-                        {link}
-                      </a>
-                    ))}
-                  </div>
+                  <h3 className="text-sm font-medium mb-1">Описание</h3>
+                  <p className="text-sm text-muted-foreground">{client.description}</p>
                 </div>
-              )}
-
-              <div>
-                <h3 className="text-sm font-medium">Проекты ({clientProjects.length}):</h3>
-                {clientProjects.length > 0 ? (
-                  <div className="space-y-2 mt-2">
-                    {clientProjects.map(project => (
-                      <div key={project.id} className="p-3 border rounded-md">
-                        <div className="flex justify-between items-center">
-                          <h4 className="font-medium">{project.name}</h4>
-                          <Badge variant={project.status === 'active' ? 'default' : 
-                            project.status === 'completed' ? 'success' : 'secondary'}>
-                            {project.status === 'active' ? 'Активный' : 
-                             project.status === 'completed' ? 'Завершен' : 'На паузе'}
-                          </Badge>
-                        </div>
-                        <p className="text-sm text-muted-foreground mt-1">{project.description}</p>
-                        <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
-                          <Calendar className="h-3 w-3" />
-                          <span>Начало: {format(new Date(project.startDate), 'dd MMM yyyy', {locale: ru})}</span>
-                          {project.endDate && (
-                            <span>- {format(new Date(project.endDate), 'dd MMM yyyy', {locale: ru})}</span>
-                          )}
-                        </div>
-                      </div>
-                    ))}
+                
+                {client.website && (
+                  <div>
+                    <h3 className="text-sm font-medium mb-1">Веб-сайт</h3>
+                    <a 
+                      href={client.website} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-sm text-primary flex items-center gap-1 hover:underline"
+                    >
+                      {client.website}
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
                   </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground mt-2">Нет связанных проектов</p>
+                )}
+                
+                {client.contactPerson && (
+                  <div>
+                    <h3 className="text-sm font-medium mb-1">Контактное лицо</h3>
+                    <p className="text-sm text-muted-foreground">{client.contactPerson}</p>
+                  </div>
+                )}
+                
+                {client.contactEmail && (
+                  <div>
+                    <h3 className="text-sm font-medium mb-1">Email</h3>
+                    <a 
+                      href={`mailto:${client.contactEmail}`}
+                      className="text-sm text-primary hover:underline"
+                    >
+                      {client.contactEmail}
+                    </a>
+                  </div>
+                )}
+                
+                {client.contactPhone && (
+                  <div>
+                    <h3 className="text-sm font-medium mb-1">Телефон</h3>
+                    <a 
+                      href={`tel:${client.contactPhone}`}
+                      className="text-sm text-primary hover:underline"
+                    >
+                      {client.contactPhone}
+                    </a>
+                  </div>
                 )}
               </div>
-
-              <div>
-                <h3 className="text-sm font-medium">Статистика:</h3>
-                <div className="grid grid-cols-2 gap-4 mt-2">
-                  <div className="p-3 border rounded-md">
-                    <h4 className="text-sm font-medium">Всего задач</h4>
-                    <p className="text-2xl font-bold">{clientTasks.length}</p>
-                  </div>
-                  <div className="p-3 border rounded-md">
-                    <h4 className="text-sm font-medium">Всего проектов</h4>
-                    <p className="text-2xl font-bold">{clientProjects.length}</p>
-                  </div>
-                </div>
-              </div>
             </div>
-          </TabsContent>
-
-          {/* Tasks Tab */}
-          <TabsContent value="tasks" className="space-y-4">
-            <h3 className="text-lg font-medium">Задачи по проектам</h3>
-            
-            {Object.keys(tasksByProject).length > 0 ? (
-              <div className="space-y-6">
-                {Object.entries(tasksByProject).map(([projectId, tasks]) => {
-                  const project = projectId !== 'no-project' 
-                    ? clientProjects.find(p => p.id === projectId) 
-                    : null;
-                  
-                  return (
-                    <div key={projectId} className="space-y-2">
-                      <h4 className="font-medium flex items-center gap-2">
-                        {project ? project.name : 'Задачи без проекта'}
-                        <Badge variant="outline">{tasks.length}</Badge>
-                      </h4>
-                      <div className="space-y-2">
-                        {tasks.map(task => (
-                          <div key={task.id} className="p-3 border rounded-md">
-                            <div className="flex justify-between items-center">
-                              <h5 className="font-medium">{task.title}</h5>
-                              <Badge variant={
-                                task.status === 'completed' ? 'success' :
-                                task.status === 'in-progress' ? 'default' :
-                                task.status === 'under-review' ? 'warning' :
-                                task.status === 'canceled' ? 'destructive' : 'secondary'
-                              }>
-                                {task.status === 'completed' ? 'Завершена' :
-                                 task.status === 'in-progress' ? 'В работе' :
-                                 task.status === 'under-review' ? 'На проверке' :
-                                 task.status === 'canceled' ? 'Отменена' : 'Черновик'}
-                              </Badge>
-                            </div>
-                            <p className="text-sm text-muted-foreground mt-1">{task.description}</p>
-                            <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
-                              <Calendar className="h-3 w-3" />
-                              <span>Срок: {format(new Date(task.dueDate), 'dd MMM yyyy', {locale: ru})}</span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <p className="text-muted-foreground">Нет задач для этого клиента</p>
-            )}
-          </TabsContent>
-
-          {/* History Tab */}
-          <TabsContent value="history" className="space-y-4">
-            <h3 className="text-lg font-medium">История взаимодействий</h3>
-            
-            {sortedTasks.length > 0 ? (
-              <div className="space-y-4">
-                {sortedTasks.map(task => {
-                  const project = task.projectId 
-                    ? clientProjects.find(p => p.id === task.projectId) 
-                    : null;
-                  
-                  return (
-                    <div key={task.id} className="flex gap-4 p-4 border rounded-md">
-                      <div className="flex-shrink-0 mt-0.5">
-                        <Clock className="h-5 w-5 text-muted-foreground" />
-                      </div>
-                      <div className="flex-grow">
-                        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
-                          <h4 className="font-medium">{task.title}</h4>
-                          <div className="flex items-center gap-2">
-                            <Badge variant={
-                              task.status === 'completed' ? 'success' :
-                              task.status === 'in-progress' ? 'default' :
-                              task.status === 'under-review' ? 'warning' :
-                              task.status === 'canceled' ? 'destructive' : 'secondary'
-                            }>
-                              {task.status === 'completed' ? 'Завершена' :
-                               task.status === 'in-progress' ? 'В работе' :
-                               task.status === 'under-review' ? 'На проверке' :
-                               task.status === 'canceled' ? 'Отменена' : 'Черновик'}
-                            </Badge>
-                          </div>
+          )}
+          
+          {activeTab === "projects" && (
+            <div className="space-y-4">
+              {projects.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground">Нет проектов для этого клиента</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {projects.map((project) => (
+                    <Card key={project.id}>
+                      <CardHeader className="p-4 pb-2">
+                        <CardTitle className="text-base">{project.name}</CardTitle>
+                        <CardDescription className="line-clamp-2">{project.description}</CardDescription>
+                      </CardHeader>
+                      <CardContent className="p-4 pt-0">
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                          <Calendar className="h-3 w-3" />
+                          <span>
+                            {project.startDate && format(new Date(project.startDate), "dd MMM yyyy", { locale: ru })}
+                            {project.endDate && ` - ${format(new Date(project.endDate), "dd MMM yyyy", { locale: ru })}`}
+                          </span>
                         </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+          
+          {activeTab === "tasks" && (
+            <div className="space-y-4">
+              {clientTasks.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground">Нет задач для этого клиента</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {Object.keys(tasksByProject).length > 0 ? (
+                    <div className="space-y-6">
+                      {Object.entries(tasksByProject).map(([projectId, tasks]) => {
+                        const project = projectId !== 'no-project' 
+                          ? clientProjects.find(p => p.id === projectId) 
+                          : null;
                         
-                        <p className="text-sm text-muted-foreground mt-1">{task.description}</p>
-                        
-                        <div className="flex flex-wrap gap-x-4 gap-y-2 mt-2 text-xs text-muted-foreground">
-                          {project && (
-                            <div className="flex items-center gap-1">
-                              <Link2 className="h-3 w-3" />
-                              <span>Проект: {project.name}</span>
-                            </div>
-                          )}
-                          
-                          <div className="flex items-center gap-1">
-                            <Calendar className="h-3 w-3" />
-                            <span>Создана: {format(new Date(task.createdAt), 'dd MMM yyyy', {locale: ru})}</span>
-                          </div>
-                          
-                          <div className="flex items-center gap-1">
-                            <Calendar className="h-3 w-3" />
-                            <span>Срок: {format(new Date(task.dueDate), 'dd MMM yyyy', {locale: ru})}</span>
-                          </div>
-                        </div>
-                        
-                        {task.comments && task.comments.length > 0 && (
-                          <div className="mt-3">
-                            <h5 className="text-xs font-medium mb-2">Комментарии:</h5>
+                        return (
+                          <div key={projectId} className="space-y-2">
+                            <h4 className="font-medium flex items-center gap-2">
+                              {project ? project.name : 'Задачи без проекта'}
+                              <CustomBadge variant={project?.status === 'active' ? 'default' : 
+                                project?.status === 'completed' ? 'secondary' : 'outline'}>
+                                {project?.status === 'active' ? 'Активный' : 
+                                 project?.status === 'completed' ? 'Завершен' : 'На паузе'}
+                              </CustomBadge>
+                            </h4>
                             <div className="space-y-2">
-                              {task.comments.map(comment => (
-                                <div key={comment.id} className="text-xs p-2 bg-muted rounded-md">
-                                  <div className="flex justify-between items-center">
-                                    <span className="font-medium">{comment.user.name}</span>
-                                    <span className="text-muted-foreground">
-                                      {format(new Date(comment.createdAt), 'dd MMM yyyy HH:mm', {locale: ru})}
-                                    </span>
-                                  </div>
-                                  <p className="mt-1">{comment.content}</p>
-                                </div>
+                              {tasks.map(task => (
+                                <Card key={task.id}>
+                                  <CardHeader className="p-3 pb-2">
+                                    <div className="flex justify-between items-start">
+                                      <CardTitle className="text-base">{task.title}</CardTitle>
+                                      <CustomBadge variant={
+                                        task.status === 'completed' ? 'success' :
+                                        task.status === 'in-progress' ? 'default' :
+                                        task.status === 'under-review' ? 'warning' :
+                                        task.status === 'canceled' ? 'destructive' : 'secondary'
+                                      }>
+                                        {task.status === 'draft' ? 'Черновик' :
+                                         task.status === 'in-progress' ? 'В процессе' :
+                                         task.status === 'under-review' ? 'На проверке' :
+                                         task.status === 'completed' ? 'Завершено' : 'Отменено'}
+                                      </CustomBadge>
+                                    </div>
+                                  </CardHeader>
+                                  <CardContent>
+                                    <p className="text-sm text-muted-foreground mt-1">{task.description}</p>
+                                    <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
+                                      <Calendar className="h-3 w-3" />
+                                      <span>Срок: {format(new Date(task.dueDate), 'dd MMM yyyy', {locale: ru})}</span>
+                                    </div>
+                                  </CardContent>
+                                </Card>
                               ))}
                             </div>
                           </div>
-                        )}
-                      </div>
+                        );
+                      })}
                     </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <p className="text-muted-foreground">Нет истории взаимодействий для этого клиента</p>
-            )}
-          </TabsContent>
-        </Tabs>
+                  ) : (
+                    <p className="text-muted-foreground">Нет задач для этого клиента</p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </DialogContent>
     </Dialog>
   );

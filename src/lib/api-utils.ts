@@ -2,7 +2,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { Client, Project, Task, Status, SubTask } from './types';
 import { useAuth } from '@/contexts/AuthContext';
 
-const API_BASE_URL = 'http://localhost:5000/api';
+const API_BASE_URL = 'http://localhost:5001/api';
 
 // Local storage keys
 const NOTES_KEY = 'task_pulse_notes';
@@ -21,10 +21,24 @@ interface Note {
 }
 
 // Helper function to get auth headers
-const getAuthHeaders = (token: string) => ({
-  'Content-Type': 'application/json',
-  'Authorization': `Bearer ${token}`
-});
+const getAuthHeaders = (token: string) => {
+  // Get user email from storage
+  let userEmail = null;
+  
+  // Try to get from localStorage first
+  if (localStorage.getItem('persistMode') === 'true') {
+    userEmail = localStorage.getItem('userEmail');
+  } else {
+    // Otherwise try sessionStorage
+    userEmail = sessionStorage.getItem('userEmail');
+  }
+  
+  return {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}`,
+    ...(userEmail ? { 'X-User-Email': userEmail } : {})
+  };
+};
 
 // Get clients
 export const getClients = async (token: string): Promise<Client[]> => {
@@ -146,6 +160,24 @@ export interface TaskInput {
   projectId?: string;
   assigneeIds: string[];
   subtasks: { title: string; completed: boolean }[];
+  fileAttachments?: { name: string; path: string; }[];
+  comments?: { 
+    text: string; 
+    author: { 
+      id: string; 
+      name: string; 
+    }; 
+    timestamp: string 
+  }[];
+  changeHistory?: { 
+    text: string; 
+    author: { 
+      id: string; 
+      name: string; 
+    }; 
+    timestamp: string 
+  }[];
+  createdBy?: string;
 }
 
 export const addTask = async (taskData: TaskInput, token: string): Promise<Task> => {
@@ -379,5 +411,165 @@ export const getTasksByStatus = async (token: string) => {
       completed: [],
       canceled: []
     };
+  }
+};
+
+// Delete task
+export const deleteTask = async (taskId: string, token: string): Promise<void> => {
+  const response = await fetch(`${API_BASE_URL}/tasks/${taskId}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(token)
+  });
+  
+  if (!response.ok) {
+    throw new Error('Failed to delete task');
+  }
+};
+
+// Delete client
+export const deleteClient = async (clientId: string, token: string): Promise<void> => {
+  const response = await fetch(`${API_BASE_URL}/clients/${clientId}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(token)
+  });
+  
+  if (!response.ok) {
+    throw new Error('Failed to delete client');
+  }
+};
+
+// Delete project
+export const deleteProject = async (projectId: string, token: string): Promise<void> => {
+  const response = await fetch(`${API_BASE_URL}/projects/${projectId}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(token)
+  });
+  
+  if (!response.ok) {
+    throw new Error('Failed to delete project');
+  }
+};
+
+// Update task
+export const updateTask = async (taskId: string, taskData: Partial<Task>, token: string): Promise<Task> => {
+  const response = await fetch(`${API_BASE_URL}/tasks/${taskId}`, {
+    method: 'PUT',
+    headers: getAuthHeaders(token),
+    body: JSON.stringify(taskData)
+  });
+  
+  if (!response.ok) {
+    throw new Error('Failed to update task');
+  }
+  
+  return response.json();
+};
+
+// Send notification to a user
+export const sendNotification = async (userId: string, notification: any, token: string): Promise<void> => {
+  try {
+    // First, try to send notification to the server
+    const response = await fetch(`${API_BASE_URL}/users/${userId}/notifications`, {
+      method: 'POST',
+      headers: getAuthHeaders(token),
+      body: JSON.stringify(notification)
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to send notification to server');
+    }
+    
+    // As a fallback, also store the notification in local storage
+    // This ensures notifications work even if the server request fails
+    try {
+      // Get the current user data from storage
+      let userData;
+      const persistMode = localStorage.getItem('persistMode');
+      
+      if (persistMode === 'true') {
+        userData = JSON.parse(localStorage.getItem('user') || '{}');
+      } else {
+        userData = JSON.parse(sessionStorage.getItem('user') || '{}');
+      }
+      
+      // Find the target user in local storage
+      // For demo purposes, we'll use mock data if the user isn't found
+      const mockUsers = [
+        { 
+          id: '1', 
+          name: 'Admin User', 
+          email: 'admin@gmail.com', 
+          role: 'team-lead',
+          notifications: []
+        },
+        { 
+          id: '2', 
+          name: 'Hus S', 
+          email: 'tester@gmail.com', 
+          role: 'employee',
+          notifications: []
+        }
+      ];
+      
+      // If the notification is for the current user, update their notifications
+      if (userData.id === userId) {
+        // Add the notification to the user's notifications
+        const newNotification = {
+          ...notification,
+          id: crypto.randomUUID(),
+          timestamp: new Date().toISOString(),
+          read: false
+        };
+        
+        userData.notifications = userData.notifications || [];
+        userData.notifications.push(newNotification);
+        
+        // Update the storage
+        if (persistMode === 'true') {
+          localStorage.setItem('user', JSON.stringify(userData));
+        } else {
+          sessionStorage.setItem('user', JSON.stringify(userData));
+        }
+      } else {
+        // For demo purposes, store notifications for other users in a separate storage
+        // In a real app, this would be handled by the server
+        const allUsersNotifications = JSON.parse(localStorage.getItem('all_users_notifications') || '{}');
+        allUsersNotifications[userId] = allUsersNotifications[userId] || [];
+        
+        const newNotification = {
+          ...notification,
+          id: crypto.randomUUID(),
+          timestamp: new Date().toISOString(),
+          read: false
+        };
+        
+        allUsersNotifications[userId].push(newNotification);
+        localStorage.setItem('all_users_notifications', JSON.stringify(allUsersNotifications));
+      }
+    } catch (error) {
+      console.error('Error storing notification in local storage:', error);
+    }
+  } catch (error) {
+    console.error('Error sending notification:', error);
+    // For now, we'll handle this silently since notifications are not critical
+    // In a production app, we might want to queue failed notifications for retry
+  }
+};
+
+// Get my tasks (only tasks assigned to the current user or created by them)
+export const getMyTasks = async (token: string): Promise<Task[]> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/my-tasks`, {
+      headers: getAuthHeaders(token)
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch my tasks');
+    }
+    
+    return response.json();
+  } catch (error) {
+    console.error("Error fetching my tasks:", error);
+    return [];
   }
 };

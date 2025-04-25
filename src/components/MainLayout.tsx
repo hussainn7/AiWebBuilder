@@ -3,6 +3,7 @@ import { MainNav } from "./MainNav";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import Notes from "./Notes";
+import { NotificationCenter } from "@/components/ui/notifications";
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -19,8 +20,11 @@ export function MainLayout({ children, title, showNotes = false }: MainLayoutPro
       
       <div className="flex flex-col flex-1 md:ml-64 w-0 min-w-0">
         {title && (
-          <header className="sticky top-0 z-30 bg-background border-b px-4 md:px-6 py-3 md:py-4 backdrop-blur-sm bg-background/90">
+          <header className="sticky top-0 z-30 bg-background border-b px-4 md:px-6 py-3 md:py-4 backdrop-blur-sm bg-background/90 flex justify-between items-center">
             <h1 className="text-xl md:text-2xl font-semibold">{title}</h1>
+            <div className="flex items-center gap-2">
+              <NotificationCenter />
+            </div>
           </header>
         )}
         

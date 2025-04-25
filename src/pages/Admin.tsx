@@ -29,7 +29,7 @@ const Admin = () => {
   const { data: users = [], isLoading: isLoadingUsers } = useQuery({
     queryKey: ['admin-users'],
     queryFn: async () => {
-      const response = await fetch('http://localhost:5000/api/admin/users', {
+      const response = await fetch('http://localhost:5001/api/admin/users', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -44,7 +44,7 @@ const Admin = () => {
   const { data: tasks = [], isLoading: isLoadingTasks } = useQuery({
     queryKey: ['admin-tasks'],
     queryFn: async () => {
-      const response = await fetch('http://localhost:5000/api/tasks', {
+      const response = await fetch('http://localhost:5001/api/tasks', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -58,7 +58,7 @@ const Admin = () => {
   // Add user mutation
   const addUserMutation = useMutation({
     mutationFn: async (userData: typeof newUser) => {
-      const response = await fetch('http://localhost:5000/api/admin/users', {
+      const response = await fetch('http://localhost:5001/api/admin/users', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -82,7 +82,7 @@ const Admin = () => {
   // Delete user mutation
   const deleteUserMutation = useMutation({
     mutationFn: async (userId: string) => {
-      const response = await fetch(`http://localhost:5000/api/admin/users/${userId}`, {
+      const response = await fetch(`http://localhost:5001/api/admin/users/${userId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`

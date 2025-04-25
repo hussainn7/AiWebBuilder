@@ -38,26 +38,11 @@ const AdminRoute = ({ children }: { children: React.ReactNode }) => {
     return <Navigate to="/login" />;
   }
   
-  if (user?.role !== 'admin') {
-    return <Navigate to="/dashboard" />;
+  if (user?.role === 'admin') {
+    return <>{children}</>;
   }
   
-  return <>{children}</>;
-};
-
-// New component for settings route (admin-only)
-const SettingsRoute = ({ children }: { children: React.ReactNode }) => {
-  const { isAuthenticated, user } = useAuth();
-  
-  if (!isAuthenticated) {
-    return <Navigate to="/login" />;
-  }
-  
-  if (user?.role !== 'admin') {
-    return <Navigate to="/dashboard" />;
-  }
-  
-  return <>{children}</>;
+  return <Navigate to="/dashboard" />;
 };
 
 function App() {
@@ -83,7 +68,7 @@ function App() {
             <Route path="/projects" element={<PrivateRoute><Projects /></PrivateRoute>} />
             <Route path="/calendar" element={<PrivateRoute><Calendar /></PrivateRoute>} />
             <Route path="/analytics" element={<PrivateRoute><Analytics /></PrivateRoute>} />
-            <Route path="/settings" element={<SettingsRoute><Settings /></SettingsRoute>} />
+            <Route path="/settings" element={<PrivateRoute><Settings /></PrivateRoute>} />
             <Route path="/admin" element={<AdminRoute><Admin /></AdminRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>

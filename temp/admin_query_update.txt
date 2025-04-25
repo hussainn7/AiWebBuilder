@@ -2,7 +2,7 @@
   const { data: users = [], isLoading: isLoadingUsers } = useQuery({
     queryKey: ['admin-users'],
     queryFn: async () => {
-      const response = await fetch('http://localhost:5000/api/admin/users', {
+      const response = await fetch('http://localhost:5001/api/admin/users', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
